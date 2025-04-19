@@ -196,6 +196,14 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:3000', 'https://academy-frontend.railway.app'])
 CORS_ALLOW_CREDENTIALS = True
 
+# CSRF settings
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'https://onlineacademy-production.up.railway.app',
+    'https://*.railway.app'
+])
+
 # Authentication URLs
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'dashboard'
