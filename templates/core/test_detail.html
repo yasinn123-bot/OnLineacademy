@@ -1,0 +1,193 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{{ test.title }} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h1 class="mb-3">{{ test.title }}</h1>
+                    
+                    <div class="mb-3">
+                        <span class="badge bg-primary me-2">{{ test.get_language_display }}</span>
+                        <span class="text-muted">
+                            <i class="fas fa-question-circle me-1"></i> {{ questions|length }} {% trans "вопросов" %}
+                        </span>
+                    </div>
+                    
+                    <div class="mb-4">
+                        {{ test.description|linebreaks }}
+                    </div>
+                    
+                    {% if is_completed %}
+                        <div class="alert alert-success mb-4">
+                            <i class="fas fa-check-circle me-2"></i>
+                            {% trans "Вы уже прошли этот тест." %}
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Test Form -->
+                    <form id="test-form" data-test-id="{{ test.id }}">
+                        {% csrf_token %}
+                        
+                        <div class="mb-4">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                {% trans "Проходной балл" %}: <strong>{{ test.passing_score }}%</strong>
+                            </div>
+                        </div>
+                        
+                        {% for question in questions %}
+                            <div class="card mb-4 question" data-question-id="{{ question.id }}">
+                                <div class="card-header bg-white">
+                                    <h5 class="card-title mb-0">
+                                        {% trans "Вопрос" %} {{ forloop.counter }}: {{ question.text }}
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-2 small text-muted">
+                                        {% trans "Баллы" %}: {{ question.points }}
+                                    </div>
+                                    
+                                    <!-- Answer Options -->
+                                    <div class="list-group">
+                                        {% for answer in question.answers.all %}
+                                            <div class="list-group-item">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="question_{{ question.id }}" 
+                                                           id="answer_{{ answer.id }}" value="{{ answer.id }}" required>
+                                                    <label class="form-check-label" for="answer_{{ answer.id }}">
+                                                        {{ answer.text }}
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        
+                        <div id="test-result" class="mb-4"></div>
+                        
+                        <div class="d-grid gap-2 col-md-6 mx-auto">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-check-circle me-2"></i>{% trans "Завершить тест" %}
+                            </button>
+                            
+                            {% if test.course %}
+                                <a href="{% url 'course-detail' test.course.id %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-2"></i>{% trans "Вернуться к курсу" %}
+                                </a>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const testForm = document.getElementById('test-form');
+        
+        if (testForm) {
+            testForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const testId = this.getAttribute('data-test-id');
+                const answers = [];
+                
+                // Collect all selected answers
+                const questions = document.querySelectorAll('.question');
+                let allAnswered = true;
+                
+                questions.forEach(question => {
+                    const questionId = question.getAttribute('data-question-id');
+                    const selectedAnswer = question.querySelector('input[type="radio"]:checked');
+                    
+                    if (selectedAnswer) {
+                        answers.push({
+                            question_id: questionId,
+                            answer_id: selectedAnswer.value
+                        });
+                    } else {
+                        allAnswered = false;
+                    }
+                });
+                
+                if (!allAnswered) {
+                    alert('{% trans "Пожалуйста, ответьте на все вопросы" %}');
+                    return;
+                }
+                
+                // Disable the submit button during submission
+                const submitButton = testForm.querySelector('button[type="submit"]');
+                const originalButtonText = submitButton.innerHTML;
+                submitButton.disabled = true;
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>{% trans "Идет проверка..." %}';
+                
+                fetch(`/api/tests/${testId}/submit/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                    },
+                    body: JSON.stringify({ answers }),
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Error submitting test');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonText;
+                    
+                    if (data.certificate_id) {
+                        window.location.href = `/certificates/${data.certificate_id}/`;
+                    } else {
+                        const resultElement = document.getElementById('test-result');
+                        if (resultElement) {
+                            resultElement.innerHTML = `
+                                <div class="alert ${data.passed ? 'alert-success' : 'alert-danger'}">
+                                    <h4>${data.passed ? '{% trans "Поздравляем!" %}' : '{% trans "Попробуйте еще раз" %}'}</h4>
+                                    <p>{% trans "Ваш результат" %}: ${data.score.toFixed(1)}%</p>
+                                    <p>${data.passed ? 
+                                        '{% trans "Вы успешно прошли тест!" %}' : 
+                                        '{% trans "К сожалению, вы не прошли тест. Попробуйте снова после повторения материала." %}'}</p>
+                                </div>
+                            `;
+                            resultElement.scrollIntoView({ behavior: 'smooth' });
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    submitButton.disabled = false;
+                    submitButton.innerHTML = originalButtonText;
+                    
+                    const resultElement = document.getElementById('test-result');
+                    if (resultElement) {
+                        resultElement.innerHTML = `
+                            <div class="alert alert-danger">
+                                <h4>{% trans "Ошибка" %}</h4>
+                                <p>{% trans "Произошла ошибка при отправке ответов. Пожалуйста, попробуйте снова." %}</p>
+                            </div>
+                        `;
+                        resultElement.scrollIntoView({ behavior: 'smooth' });
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endblock %} 

@@ -1,0 +1,225 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% trans "Результаты теста" %} | {{ quiz.title }} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .correct-answer {
+        color: #198754;
+        font-weight: bold;
+    }
+    .incorrect-answer {
+        color: #dc3545;
+        text-decoration: line-through;
+    }
+    .user-answer {
+        font-weight: bold;
+    }
+    .explanation-box {
+        background-color: #f8f9fa;
+        border-left: 4px solid #0d6efd;
+        padding: 15px;
+        margin-top: 10px;
+        border-radius: 4px;
+    }
+    .question-card {
+        margin-bottom: 20px;
+    }
+    .result-header {
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+    .pass-result {
+        background-color: rgba(25, 135, 84, 0.15);
+    }
+    .fail-result {
+        background-color: rgba(220, 53, 69, 0.15);
+    }
+    .certificate-btn {
+        margin-top: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'course:course_detail' quiz.course.id %}">{{ quiz.course.title }}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'quiz:quiz_detail' quiz.id %}">{{ quiz.title }}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{% trans "Результаты" %}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow mb-4">
+                <div class="card-body">
+                    <h2 class="card-title text-center mb-4">{{ quiz.title }}</h2>
+                    
+                    <!-- Result Summary -->
+                    <div class="result-header {% if passed %}pass-result{% else %}fail-result{% endif %}">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h3 class="mb-3">
+                                    {% if passed %}
+                                        <i class="fas fa-check-circle text-success me-2"></i>
+                                        {% trans "Тест пройден успешно!" %}
+                                    {% else %}
+                                        <i class="fas fa-times-circle text-danger me-2"></i>
+                                        {% trans "Тест не пройден" %}
+                                    {% endif %}
+                                </h3>
+                                <p class="mb-1">
+                                    <i class="fas fa-clipboard-check me-2"></i>
+                                    <strong>{% trans "Ваш результат:" %}</strong> {{ score }}%
+                                    ({{ correct_answers }}/{{ total_questions }})
+                                </p>
+                                <p class="mb-1">
+                                    <i class="fas fa-award me-2"></i>
+                                    <strong>{% trans "Проходной балл:" %}</strong> {{ quiz.passing_score }}%
+                                </p>
+                                <p class="mb-1">
+                                    <i class="fas fa-clock me-2"></i>
+                                    <strong>{% trans "Время выполнения:" %}</strong> {{ completion_time }}
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-center">
+                                <div class="progress" style="height: 10px;">
+                                    <div class="progress-bar {% if passed %}bg-success{% else %}bg-danger{% endif %}" 
+                                         role="progressbar" 
+                                         style="width: {{ score }}%;" 
+                                         aria-valuenow="{{ score }}" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                    </div>
+                                </div>
+                                <p class="mt-2 display-4">{{ score }}%</p>
+                                
+                                {% if passed and quiz.generates_certificate %}
+                                <div class="certificate-btn">
+                                    <a href="{% url 'certificate:view_certificate' attempt.id %}" class="btn btn-outline-success">
+                                        <i class="fas fa-certificate me-2"></i>{% trans "Посмотреть сертификат" %}
+                                    </a>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="d-flex justify-content-between mb-4">
+                        <a href="{% url 'course:course_detail' quiz.course.id %}" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left me-2"></i>{% trans "Вернуться к курсу" %}
+                        </a>
+                        {% if not passed %}
+                        <a href="{% url 'quiz:take_quiz' quiz.id %}" class="btn btn-primary">
+                            <i class="fas fa-redo me-2"></i>{% trans "Пройти тест снова" %}
+                        </a>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Questions Review -->
+                    <h4 class="mb-3 border-bottom pb-2">{% trans "Детальный обзор" %}</h4>
+                    
+                    {% for question in questions %}
+                    <div class="card question-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <span class="fw-bold">{% trans "Вопрос" %} {{ forloop.counter }}</span>
+                            <span class="badge {% if question.is_correct %}bg-success{% else %}bg-danger{% endif %}">
+                                {% if question.is_correct %}
+                                    <i class="fas fa-check me-1"></i>{% trans "Верно" %}
+                                {% else %}
+                                    <i class="fas fa-times me-1"></i>{% trans "Неверно" %}
+                                {% endif %}
+                                <span class="ms-2 badge bg-light text-dark">{{ question.points }} {% trans "баллов" %}</span>
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text">{{ question.text }}</p>
+                            
+                            {% if question.question_type == 'short_answer' %}
+                                <div class="mt-3 mb-3">
+                                    <p><strong>{% trans "Ваш ответ:" %}</strong> 
+                                        <span class="{% if question.is_correct %}correct-answer{% else %}incorrect-answer{% endif %}">
+                                            {{ question.user_answer }}
+                                        </span>
+                                    </p>
+                                    {% if not question.is_correct %}
+                                        <p><strong>{% trans "Правильный ответ:" %}</strong> 
+                                            <span class="correct-answer">{{ question.correct_answer }}</span>
+                                        </p>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <ul class="list-group">
+                                    {% for choice in question.choices %}
+                                    <li class="list-group-item {% if choice.is_user_selected and choice.is_correct %}list-group-item-success{% elif choice.is_user_selected and not choice.is_correct %}list-group-item-danger{% elif choice.is_correct %}list-group-item-light{% endif %}">
+                                        <div class="d-flex align-items-center">
+                                            {% if choice.is_user_selected %}
+                                                <i class="fas fa-check-square me-2 {% if choice.is_correct %}text-success{% else %}text-danger{% endif %}"></i>
+                                            {% elif choice.is_correct %}
+                                                <i class="fas fa-check me-2 text-success"></i>
+                                            {% else %}
+                                                <i class="fas fa-square-o me-2 text-secondary"></i>
+                                            {% endif %}
+                                            
+                                            <span class="{% if choice.is_user_selected %}user-answer{% endif %} 
+                                                       {% if choice.is_correct %}correct-answer{% endif %}
+                                                       {% if choice.is_user_selected and not choice.is_correct %}incorrect-answer{% endif %}">
+                                                {{ choice.text }}
+                                            </span>
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            
+                            {% if question.explanation %}
+                                <div class="explanation-box mt-3">
+                                    <h6><i class="fas fa-info-circle me-2"></i>{% trans "Объяснение:" %}</h6>
+                                    <p class="mb-0">{{ question.explanation }}</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Related Quizzes -->
+            {% if related_quizzes %}
+                <div class="card shadow">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">{% trans "Другие тесты по этой теме" %}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for related in related_quizzes %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title">{{ related.title }}</h6>
+                                            <p class="card-text small">{{ related.description|truncatechars:100 }}</p>
+                                            <a href="{% url 'quiz:quiz_detail' related.id %}" class="btn btn-sm btn-outline-primary">
+                                                {% trans "Перейти к тесту" %}
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

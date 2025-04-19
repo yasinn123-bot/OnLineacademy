@@ -1,0 +1,268 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% trans "Добавить вопрос" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .choice-row {
+        position: relative;
+        margin-bottom: 10px;
+    }
+    .remove-choice {
+        position: absolute;
+        right: -40px;
+        top: 5px;
+    }
+    #choices-container {
+        margin-bottom: 15px;
+    }
+    .short-answer-field {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'quiz:quiz_list' %}">{% trans "Тесты" %}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'quiz:quiz_detail' quiz.id %}">{{ quiz.title }}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'quiz:edit_quiz' quiz.id %}">{% trans "Редактировать" %}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{% trans "Добавить вопрос" %}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">{% trans "Добавление вопроса" %}</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="question-form">
+                        {% csrf_token %}
+                        
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <label for="question_text" class="form-label">{% trans "Текст вопроса" %}*</label>
+                            <textarea class="form-control" id="question_text" name="question_text" rows="3" required></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="question_type" class="form-label">{% trans "Тип вопроса" %}*</label>
+                            <select class="form-select" id="question_type" name="question_type" required>
+                                <option value="single">{% trans "Один правильный вариант" %}</option>
+                                <option value="multiple">{% trans "Несколько правильных вариантов" %}</option>
+                                <option value="short_answer">{% trans "Короткий ответ (текст)" %}</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="points" class="form-label">{% trans "Количество баллов" %}*</label>
+                            <input type="number" class="form-control" id="points" name="points" value="1" min="1" max="100" required>
+                            <small class="form-text text-muted">{% trans "Сколько баллов получит студент за правильный ответ на этот вопрос." %}</small>
+                        </div>
+                        
+                        <!-- Choices for single/multiple choice questions -->
+                        <div id="choices-section">
+                            <label class="form-label">{% trans "Варианты ответов" %}*</label>
+                            <div id="choices-container">
+                                <!-- Initially add two choice options -->
+                                <div class="choice-row">
+                                    <div class="input-group">
+                                        <div class="input-group-text">
+                                            <input type="checkbox" class="form-check-input correct-choice" name="correct_choices[]" value="0">
+                                        </div>
+                                        <input type="text" class="form-control" name="choices[]" placeholder="{% trans 'Вариант ответа' %}" required>
+                                        <button type="button" class="btn btn-outline-danger remove-choice">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="choice-row">
+                                    <div class="input-group">
+                                        <div class="input-group-text">
+                                            <input type="checkbox" class="form-check-input correct-choice" name="correct_choices[]" value="1">
+                                        </div>
+                                        <input type="text" class="form-control" name="choices[]" placeholder="{% trans 'Вариант ответа' %}" required>
+                                        <button type="button" class="btn btn-outline-danger remove-choice">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="button" id="add-choice" class="btn btn-outline-primary">
+                                <i class="fas fa-plus me-2"></i>{% trans "Добавить вариант" %}
+                            </button>
+                            
+                            <div class="form-text mt-2" id="choice-help-text">
+                                {% trans "Отметьте правильный вариант ответа галочкой слева." %}
+                            </div>
+                        </div>
+                        
+                        <!-- Short answer field -->
+                        <div id="short-answer-section" class="mb-3 short-answer-field">
+                            <label for="answer_text" class="form-label">{% trans "Правильный ответ" %}*</label>
+                            <input type="text" class="form-control" id="answer_text" name="answer_text">
+                            <small class="form-text text-muted">{% trans "Введите правильный ответ для вопроса. Регистр букв не будет учитываться при проверке." %}</small>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="explanation_checkbox">
+                            <label class="form-check-label" for="explanation_checkbox">{% trans "Добавить объяснение ответа" %}</label>
+                        </div>
+                        
+                        <div class="mb-4" id="explanation-section" style="display: none;">
+                            <label for="explanation" class="form-label">{% trans "Объяснение" %}</label>
+                            <textarea class="form-control" id="explanation" name="explanation" rows="3"></textarea>
+                            <small class="form-text text-muted">{% trans "Это объяснение будет показано студенту после ответа на вопрос." %}</small>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-between">
+                            <a href="{% url 'quiz:edit_quiz' quiz.id %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>{% trans "Вернуться к тесту" %}
+                            </a>
+                            <div>
+                                <button type="submit" name="save_and_add" class="btn btn-outline-primary">
+                                    <i class="fas fa-save me-1"></i> {% trans "Сохранить и добавить еще" %}
+                                </button>
+                                <button type="submit" name="save" class="btn btn-success">
+                                    <i class="fas fa-check me-1"></i> {% trans "Сохранить" %}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const questionTypeSelect = document.getElementById('question_type');
+        const choicesSection = document.getElementById('choices-section');
+        const shortAnswerSection = document.getElementById('short-answer-section');
+        const choiceHelpText = document.getElementById('choice-help-text');
+        const addChoiceBtn = document.getElementById('add-choice');
+        const choicesContainer = document.getElementById('choices-container');
+        const explanationCheckbox = document.getElementById('explanation_checkbox');
+        const explanationSection = document.getElementById('explanation-section');
+        
+        // Toggle explanation section
+        explanationCheckbox.addEventListener('change', function() {
+            explanationSection.style.display = this.checked ? 'block' : 'none';
+        });
+        
+        // Handle question type changes
+        questionTypeSelect.addEventListener('change', function() {
+            if (this.value === 'short_answer') {
+                choicesSection.style.display = 'none';
+                shortAnswerSection.style.display = 'block';
+            } else {
+                choicesSection.style.display = 'block';
+                shortAnswerSection.style.display = 'none';
+                
+                // Update checkbox behavior for single/multiple choice
+                const checkboxes = document.querySelectorAll('.correct-choice');
+                if (this.value === 'single') {
+                    checkboxes.forEach(cb => {
+                        cb.type = 'radio';
+                        cb.name = 'correct_choice';
+                    });
+                    choiceHelpText.textContent = '{% trans "Отметьте правильный вариант ответа." %}';
+                } else {
+                    checkboxes.forEach(cb => {
+                        cb.type = 'checkbox';
+                        cb.name = 'correct_choices[]';
+                    });
+                    choiceHelpText.textContent = '{% trans "Отметьте все правильные варианты ответов." %}';
+                }
+            }
+        });
+        
+        // Add new choice option
+        let choiceCounter = 2; // Start from 2 as we already have two choices
+        addChoiceBtn.addEventListener('click', function() {
+            const newRow = document.createElement('div');
+            newRow.className = 'choice-row';
+            
+            const inputType = questionTypeSelect.value === 'single' ? 'radio' : 'checkbox';
+            const inputName = questionTypeSelect.value === 'single' ? 'correct_choice' : 'correct_choices[]';
+            
+            newRow.innerHTML = `
+                <div class="input-group">
+                    <div class="input-group-text">
+                        <input type="${inputType}" class="form-check-input correct-choice" name="${inputName}" value="${choiceCounter}">
+                    </div>
+                    <input type="text" class="form-control" name="choices[]" placeholder="{% trans 'Вариант ответа' %}" required>
+                    <button type="button" class="btn btn-outline-danger remove-choice">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            
+            choicesContainer.appendChild(newRow);
+            choiceCounter++;
+            
+            // Add event listener to new remove button
+            newRow.querySelector('.remove-choice').addEventListener('click', function() {
+                if (choicesContainer.children.length > 2) {
+                    this.closest('.choice-row').remove();
+                } else {
+                    alert('{% trans "Должно быть как минимум два варианта ответа" %}');
+                }
+            });
+        });
+        
+        // Remove choice event delegation
+        choicesContainer.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-choice') || e.target.closest('.remove-choice')) {
+                if (choicesContainer.children.length > 2) {
+                    e.target.closest('.choice-row').remove();
+                } else {
+                    alert('{% trans "Должно быть как минимум два варианта ответа" %}');
+                }
+            }
+        });
+        
+        // Form validation before submit
+        document.getElementById('question-form').addEventListener('submit', function(e) {
+            if (questionTypeSelect.value !== 'short_answer') {
+                // For choice questions, check if at least one correct answer is selected
+                const selectedCorrect = document.querySelectorAll('.correct-choice:checked');
+                if (selectedCorrect.length === 0) {
+                    e.preventDefault();
+                    alert('{% trans "Выберите хотя бы один правильный ответ" %}');
+                    return false;
+                }
+            } else {
+                // For short answer, check if answer is provided
+                if (document.getElementById('answer_text').value.trim() === '') {
+                    e.preventDefault();
+                    alert('{% trans "Введите правильный ответ для вопроса с коротким ответом" %}');
+                    return false;
+                }
+            }
+            return true;
+        });
+    });
+</script>
+{% endblock %} 

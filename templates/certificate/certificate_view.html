@@ -1,0 +1,205 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% trans "Сертификат" %} | {{ certificate.user.get_full_name }} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .certificate-container {
+        background-color: #fff;
+        border: 20px solid #0d6efd;
+        border-radius: 10px;
+        width: 100%;
+        position: relative;
+        padding: 30px;
+        margin: 0 auto;
+        max-width: 800px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+        font-family: 'Cormorant Garamond', serif;
+    }
+    
+    .certificate-header {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    
+    .certificate-title {
+        font-size: 36px;
+        color: #0d6efd;
+        margin-bottom: 10px;
+        font-weight: bold;
+    }
+    
+    .certificate-subtitle {
+        font-size: 24px;
+        color: #444;
+        margin-bottom: 15px;
+    }
+    
+    .certificate-content {
+        text-align: center;
+        margin: 40px 0;
+    }
+    
+    .recipient-name {
+        font-size: 42px;
+        font-weight: bold;
+        color: #0d6efd;
+        margin: 20px 0;
+        font-family: 'Cormorant Garamond', serif;
+    }
+    
+    .certificate-text {
+        font-size: 20px;
+        line-height: 1.5;
+        margin: 20px 0;
+    }
+    
+    .certificate-footer {
+        margin-top: 30px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+    }
+    
+    .certificate-date {
+        font-size: 18px;
+        color: #555;
+    }
+    
+    .certificate-signature {
+        text-align: center;
+        margin-top: 10px;
+    }
+    
+    .signature-image {
+        max-height: 80px;
+        margin-bottom: 10px;
+    }
+    
+    .signature-name {
+        font-size: 18px;
+        font-weight: bold;
+    }
+    
+    .signature-title {
+        font-size: 14px;
+        color: #666;
+    }
+    
+    .certificate-seal {
+        position: absolute;
+        bottom: 30px;
+        right: 40px;
+        width: 120px;
+        height: 120px;
+        opacity: 0.5;
+    }
+    
+    .certificate-id {
+        font-size: 12px;
+        color: #777;
+        position: absolute;
+        bottom: 10px;
+        left: 30px;
+    }
+    
+    .action-buttons {
+        margin: 30px 0;
+        text-align: center;
+    }
+    
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .certificate-container, .certificate-container * {
+            visibility: visible;
+        }
+        .certificate-container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            box-shadow: none;
+        }
+        .action-buttons {
+            display: none;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="mb-4">
+                <h2>{% trans "Сертификат об окончании курса" %}</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'course:course_detail' certificate.course.id %}">{{ certificate.course.title }}</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">{% trans "Сертификат" %}</li>
+                    </ol>
+                </nav>
+            </div>
+            
+            <div class="action-buttons">
+                <button onclick="window.print();" class="btn btn-primary">
+                    <i class="fas fa-print me-2"></i>{% trans "Распечатать сертификат" %}
+                </button>
+                <a href="{% url 'certificate:download_certificate' certificate.id %}" class="btn btn-outline-primary ms-2">
+                    <i class="fas fa-download me-2"></i>{% trans "Скачать PDF" %}
+                </a>
+                <a href="{% url 'certificate:verify' certificate.verification_id %}" class="btn btn-outline-secondary ms-2" target="_blank">
+                    <i class="fas fa-certificate me-2"></i>{% trans "Проверить подлинность" %}
+                </a>
+            </div>
+            
+            <div class="certificate-container">
+                <div class="certificate-header">
+                    <img src="{% static 'img/logo.png' %}" alt="Logo" height="60">
+                    <h1 class="certificate-title">{% trans "СЕРТИФИКАТ" %}</h1>
+                    <h2 class="certificate-subtitle">{% trans "об успешном окончании курса" %}</h2>
+                </div>
+                
+                <div class="certificate-content">
+                    <p class="certificate-text">{% trans "Настоящим подтверждается, что" %}</p>
+                    <p class="recipient-name">{{ certificate.user.get_full_name }}</p>
+                    <p class="certificate-text">
+                        {% trans "успешно завершил(а) обучение по курсу" %}
+                    </p>
+                    <p class="certificate-text" style="font-weight: bold; font-size: 24px;">
+                        "{{ certificate.course.title }}"
+                    </p>
+                    <p class="certificate-text">
+                        {% trans "общей продолжительностью" %} {{ certificate.course.duration }} {% trans "часов" %}
+                    </p>
+                </div>
+                
+                <div class="certificate-footer">
+                    <div class="certificate-date">
+                        <p>{% trans "Дата выдачи" %}: {{ certificate.created_at|date:"d.m.Y" }}</p>
+                    </div>
+                    
+                    <div class="certificate-signature">
+                        <img src="{% static 'img/signature.png' %}" alt="Signature" class="signature-image">
+                        <p class="signature-name">{% trans "Директор академии" %}</p>
+                        <p class="signature-title">{% trans "Онлайн-академия детской онкологии и онкогематологии" %}</p>
+                    </div>
+                </div>
+                
+                <img src="{% static 'img/seal.png' %}" alt="Seal" class="certificate-seal">
+                <p class="certificate-id">ID: {{ certificate.verification_id }}</p>
+            </div>
+            
+            <div class="action-buttons mt-4">
+                <a href="{% url 'users:dashboard' %}" class="btn btn-outline-primary">
+                    <i class="fas fa-arrow-left me-2"></i>{% trans "Вернуться в личный кабинет" %}
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

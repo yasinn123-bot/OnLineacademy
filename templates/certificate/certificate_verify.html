@@ -1,0 +1,134 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% trans "Проверка подлинности сертификата" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">{% trans "Проверка подлинности сертификата" %}</h4>
+                </div>
+                
+                <div class="card-body">
+                    {% if certificate %}
+                        <div class="alert alert-success mb-4">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-check-circle fa-2x me-3"></i>
+                                <div>
+                                    <h5 class="mb-1">{% trans "Сертификат действителен" %}</h5>
+                                    <p class="mb-0">{% trans "Этот сертификат был выдан нашей академией и является подлинным." %}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h5>{% trans "Информация о сертификате" %}</h5>
+                                <ul class="list-group">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>{% trans "ID сертификата" %}</span>
+                                        <span class="badge bg-primary rounded-pill">{{ certificate.verification_id }}</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>{% trans "Дата выдачи" %}</span>
+                                        <span>{{ certificate.created_at|date:"d.m.Y" }}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h5>{% trans "Информация о получателе" %}</h5>
+                                <ul class="list-group">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>{% trans "Имя" %}</span>
+                                        <span>{{ certificate.user.get_full_name }}</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>{% trans "Роль" %}</span>
+                                        <span>{{ certificate.user.get_role_display }}</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <h5>{% trans "Информация о курсе" %}</h5>
+                        <div class="card mb-4">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ certificate.course.title }}</h5>
+                                <p class="card-text">{{ certificate.course.description|truncatechars:200 }}</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge bg-secondary me-2">{{ certificate.course.get_language_display }}</span>
+                                        <span class="badge bg-info">{{ certificate.course.duration }} {% trans "часов" %}</span>
+                                    </div>
+                                    <a href="{% url 'course:course_detail' certificate.course.id %}" class="btn btn-sm btn-outline-primary">
+                                        {% trans "Подробнее о курсе" %}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    {% elif verification_id %}
+                        <div class="alert alert-danger mb-4">
+                            <div class="d-flex align-items-center">
+                                <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                                <div>
+                                    <h5 class="mb-1">{% trans "Сертификат не найден" %}</h5>
+                                    <p class="mb-0">
+                                        {% trans "Сертификат с ID" %} <strong>{{ verification_id }}</strong> {% trans "не найден в нашей системе." %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <h5 class="alert-heading">{% trans "Возможные причины:" %}</h5>
+                            <ul>
+                                <li>{% trans "Введен неправильный ID сертификата" %}</li>
+                                <li>{% trans "Сертификат был отозван или аннулирован" %}</li>
+                                <li>{% trans "Сертификат является поддельным" %}</li>
+                            </ul>
+                        </div>
+                    {% else %}
+                        <form method="get" action="{% url 'certificate:verify' %}">
+                            <div class="mb-4">
+                                <p>{% trans "Введите ID сертификата для проверки его подлинности. ID сертификата обычно указан в нижней части документа." %}</p>
+                            </div>
+                            
+                            <div class="form-floating mb-3">
+                                <input type="text" class="form-control" id="verification_id" name="verification_id" 
+                                    placeholder="ID сертификата" required>
+                                <label for="verification_id">{% trans "ID сертификата" %}</label>
+                            </div>
+                            
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search me-2"></i>{% trans "Проверить сертификат" %}
+                                </button>
+                            </div>
+                        </form>
+                    {% endif %}
+                </div>
+                
+                <div class="card-footer bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-2"></i>{% trans "На главную" %}
+                        </a>
+                        
+                        {% if certificate %}
+                            <a href="{% url 'certificate:download_certificate' certificate.id %}" class="btn btn-outline-primary">
+                                <i class="fas fa-download me-2"></i>{% trans "Скачать сертификат" %}
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

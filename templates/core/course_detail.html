@@ -1,0 +1,255 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+{% load core_extras %}
+
+{% block title %}{{ course.title }} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <!-- Course Info -->
+        <div class="col-md-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h1 class="mb-3">{{ course.title }}</h1>
+                    
+                    <div class="mb-3">
+                        <span class="badge bg-primary me-1">{{ course.get_language_display }}</span>
+                        <span class="text-muted">
+                            <i class="fas fa-user me-1"></i> {{ course.author.get_full_name }}
+                        </span>
+                    </div>
+                    
+                    <div class="mb-4">
+                        {{ course.description|linebreaks }}
+                    </div>
+                    
+                    {% if not is_enrolled and user.is_authenticated %}
+                        <div class="d-grid gap-2 col-md-6 mx-auto mb-3">
+                            <form method="post" action="{% url 'course-enroll' course.id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-graduation-cap me-2"></i>{% trans "Записаться на курс" %}
+                                </button>
+                            </form>
+                        </div>
+                    {% elif not user.is_authenticated %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            {% trans "Для записи на курс необходимо" %} <a href="{% url 'login' %}?redirect={{ request.path }}">{% trans "войти" %}</a> {% trans "или" %} <a href="{% url 'register' %}">{% trans "зарегистрироваться" %}</a>.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Course Content -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h4 class="card-title mb-0">{% trans "Содержание курса" %}</h4>
+                </div>
+                <div class="card-body">
+                    {% if materials %}
+                        <div class="accordion" id="materialsAccordion">
+                            {% for material in materials %}
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="heading{{ material.id }}">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ material.id }}" aria-expanded="false" aria-controls="collapse{{ material.id }}">
+                                            <i class="
+                                                {% if material.material_type == 'video' %}fas fa-video me-2
+                                                {% elif material.material_type == 'presentation' %}fas fa-file-powerpoint me-2
+                                                {% elif material.material_type == 'document' %}fas fa-file-alt me-2
+                                                {% elif material.material_type == 'image' %}fas fa-image me-2
+                                                {% else %}fas fa-file me-2{% endif %}
+                                            "></i>
+                                            {{ material.name }}
+                                            
+                                            {% if is_enrolled %}
+                                                {% if material in user_progress.materials_completed.all %}
+                                                    <span class="badge bg-success ms-2">{% trans "Пройдено" %}</span>
+                                                {% endif %}
+                                            {% endif %}
+                                        </button>
+                                    </h2>
+                                    <div id="collapse{{ material.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ material.id }}" data-bs-parent="#materialsAccordion">
+                                        <div class="accordion-body">
+                                            <p>{{ material.description }}</p>
+                                            <p class="text-muted mb-3">
+                                                <small>
+                                                    <i class="fas fa-calendar-alt me-1"></i> {% trans "Добавлен" %}: {{ material.created_at|date:"d.m.Y" }}
+                                                    <span class="mx-2">|</span>
+                                                    <i class="fas fa-globe me-1"></i> {{ material.get_language_display }}
+                                                </small>
+                                            </p>
+                                            
+                                            {% if is_enrolled %}
+                                                <a href="{% url 'material-detail' material.id %}" class="btn btn-outline-primary">
+                                                    <i class="fas fa-book-reader me-2"></i>{% trans "Изучить материал" %}
+                                                </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-center">{% trans "Материалы курса скоро появятся." %}</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Tests -->
+            {% if tests %}
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h4 class="card-title mb-0">{% trans "Тесты и проверка знаний" %}</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="list-group">
+                            {% for test in tests %}
+                                <div class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="mb-1">{{ test.title }}</h5>
+                                        <p class="text-muted mb-0">
+                                            <small>
+                                                {% trans "Проходной балл" %}: {{ test.passing_score }}%
+                                                <span class="mx-2">|</span>
+                                                <i class="fas fa-question-circle me-1"></i> {{ test.questions.count }} {% trans "вопросов" %}
+                                            </small>
+                                        </p>
+                                    </div>
+                                    
+                                    <div>
+                                        {% if is_enrolled %}
+                                            {% if test in user_progress.tests_completed.all %}
+                                                <span class="badge bg-success me-2">{% trans "Пройден" %}</span>
+                                            {% endif %}
+                                            <a href="{% url 'test-detail' test.id %}" class="btn btn-outline-primary btn-sm">
+                                                {% if test in user_progress.tests_completed.all %}
+                                                    <i class="fas fa-redo me-1"></i>{% trans "Пройти снова" %}
+                                                {% else %}
+                                                    <i class="fas fa-edit me-1"></i>{% trans "Начать тест" %}
+                                                {% endif %}
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            <!-- Course Stats -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">{% trans "Информация" %}</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {% trans "Материалы" %}
+                            <span class="badge bg-primary rounded-pill">{{ materials|length }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {% trans "Тесты" %}
+                            <span class="badge bg-primary rounded-pill">{{ tests|length }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {% trans "Язык" %}
+                            <span>{{ course.get_language_display }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {% trans "Дата публикации" %}
+                            <span>{{ course.created_at|date:"d.m.Y" }}</span>
+                        </li>
+                    </ul>
+                    
+                    {% if is_enrolled and user_progress and user_progress.is_completed %}
+                    <div class="mt-3">
+                        <div class="d-grid">
+                            <a href="{% url 'certificate:generate_certificate' course.id %}" class="btn btn-success">
+                                <i class="fas fa-certificate me-2"></i>{% trans "Получить сертификат" %}
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Author Info -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">{% trans "Автор" %}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        {% if course.author.profile_picture %}
+                            <img src="{{ course.author.profile_picture.url }}" alt="{{ course.author.get_full_name }}" class="rounded-circle me-3" style="width: 60px; height: 60px; object-fit: cover;">
+                        {% else %}
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 60px; height: 60px;">
+                                <span class="h5 mb-0">{{ course.author.first_name|first|upper }}{{ course.author.last_name|first|upper }}</span>
+                            </div>
+                        {% endif %}
+                        <div>
+                            <h6 class="mb-0">{{ course.author.get_full_name }}</h6>
+                            <p class="text-muted mb-0 small">
+                                {% if course.author.role == 'doctor' %}
+                                    <span class="badge bg-primary">{% trans "Врач" %}</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    {% if course.author.bio %}
+                        <p class="small">{{ course.author.bio|truncatewords:30 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Progress -->
+            {% if is_enrolled %}
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">{% trans "Ваш прогресс" %}</h5>
+                    </div>
+                    <div class="card-body">
+                        {% with completed_materials=user_progress.materials_completed.count total_materials=materials|length %}
+                            <h6 class="mb-2">{% trans "Материалы" %}</h6>
+                            <div class="progress mb-3">
+                                <div class="progress-bar bg-success" 
+                                     role="progressbar" 
+                                     style="width: {% if total_materials > 0 %}{{ completed_materials|multiply:100|divide:total_materials }}{% else %}0{% endif %}%;" 
+                                     aria-valuenow="{% if total_materials > 0 %}{{ completed_materials|multiply:100|divide:total_materials }}{% else %}0{% endif %}" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                    {% if total_materials > 0 %}{{ completed_materials|multiply:100|divide:total_materials|floatformat:0 }}%{% else %}0%{% endif %}
+                                </div>
+                            </div>
+                            <p class="small text-muted mb-3">{{ completed_materials }}/{{ total_materials }} {% trans "материалов пройдено" %}</p>
+                        {% endwith %}
+                        
+                        {% with completed_tests=user_progress.tests_completed.count total_tests=tests|length %}
+                            <h6 class="mb-2">{% trans "Тесты" %}</h6>
+                            <div class="progress mb-3">
+                                <div class="progress-bar bg-success" 
+                                     role="progressbar" 
+                                     style="width: {% if total_tests > 0 %}{{ completed_tests|multiply:100|divide:total_tests }}{% else %}0{% endif %}%;" 
+                                     aria-valuenow="{% if total_tests > 0 %}{{ completed_tests|multiply:100|divide:total_tests }}{% else %}0{% endif %}" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                    {% if total_tests > 0 %}{{ completed_tests|multiply:100|divide:total_tests|floatformat:0 }}%{% else %}0%{% endif %}
+                                </div>
+                            </div>
+                            <p class="small text-muted">{{ completed_tests }}/{{ total_tests }} {% trans "тестов пройдено" %}</p>
+                        {% endwith %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,189 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% trans "Учебные материалы" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{% trans "Учебные материалы" %}</h1>
+        
+        {% if user_role == 'doctor' %}
+        <a href="{% url 'material-create' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>{% trans "Добавить материал" %}
+        </a>
+        {% endif %}
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <form method="get" action="{% url 'material-list' %}" class="mb-3">
+                <div class="input-group">
+                    <input type="text" name="search" class="form-control" placeholder="{% trans 'Поиск по названию...' %}" value="{{ request.GET.search }}">
+                    <button class="btn btn-outline-secondary" type="submit">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+        <div class="col-md-8">
+            <div class="d-flex justify-content-end">
+                <div class="btn-group me-2">
+                    <a href="{% url 'material-list' %}" class="btn btn-outline-secondary {% if not request.GET.type %}active{% endif %}">
+                        {% trans "Все" %}
+                    </a>
+                    <a href="{% url 'material-list' %}?type=video" class="btn btn-outline-secondary {% if request.GET.type == 'video' %}active{% endif %}">
+                        <i class="fas fa-video me-1"></i> {% trans "Видео" %}
+                    </a>
+                    <a href="{% url 'material-list' %}?type=document" class="btn btn-outline-secondary {% if request.GET.type == 'document' %}active{% endif %}">
+                        <i class="fas fa-file-alt me-1"></i> {% trans "Документы" %}
+                    </a>
+                    <a href="{% url 'material-list' %}?type=presentation" class="btn btn-outline-secondary {% if request.GET.type == 'presentation' %}active{% endif %}">
+                        <i class="fas fa-file-powerpoint me-1"></i> {% trans "Презентации" %}
+                    </a>
+                </div>
+                
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="languageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        {% if request.GET.language == 'ru' %}
+                            {% trans "Русский" %}
+                        {% elif request.GET.language == 'en' %}
+                            {% trans "Английский" %}
+                        {% elif request.GET.language == 'ky' %}
+                            {% trans "Кыргызский" %}
+                        {% else %}
+                            {% trans "Язык" %}
+                        {% endif %}
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="languageDropdown">
+                        <li><a class="dropdown-item" href="{% url 'material-list' %}">{% trans "Все языки" %}</a></li>
+                        <li><a class="dropdown-item" href="{% url 'material-list' %}?language=ru">{% trans "Русский" %}</a></li>
+                        <li><a class="dropdown-item" href="{% url 'material-list' %}?language=en">{% trans "Английский" %}</a></li>
+                        <li><a class="dropdown-item" href="{% url 'material-list' %}?language=ky">{% trans "Кыргызский" %}</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if materials %}
+        <div class="row">
+            {% for material in materials %}
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-header bg-white">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0 text-truncate">{{ material.name }}</h5>
+                                <span class="badge bg-primary">{{ material.get_material_type_display }}</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-2">
+                                <i class="fas fa-user me-1"></i> {{ material.author.get_full_name }}
+                                <span class="mx-1">|</span>
+                                <i class="fas fa-globe me-1"></i> {{ material.get_language_display }}
+                            </p>
+                            
+                            <p class="card-text">{{ material.description|truncatechars:100 }}</p>
+                            
+                            {% if material.course %}
+                                <p class="text-muted small">
+                                    <i class="fas fa-book me-1"></i> {% trans "Курс" %}: <a href="{% url 'course-detail' material.course.id %}">{{ material.course.title }}</a>
+                                </p>
+                            {% endif %}
+                        </div>
+                        <div class="card-footer bg-white border-top-0">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <a href="{% url 'material-detail' material.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-eye me-1"></i> {% trans "Просмотреть" %}
+                                </a>
+                                
+                                {% if user_role == 'doctor' and material.author == user %}
+                                <div>
+                                    <a href="{% url 'material-update' material.id %}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'material-delete' material.id %}" class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('{% trans "Вы уверены, что хотите удалить этот материал?" %}')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        {% if is_paginated %}
+        <div class="row">
+            <div class="col-12">
+                <nav aria-label="{% trans 'Навигация по страницам' %}">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="{% trans 'Первая' %}">
+                                    <span aria-hidden="true">&laquo;&laquo;</span>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="{% trans 'Предыдущая' %}">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active"><a class="page-link" href="#">{{ num }}</a></li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="{% trans 'Следующая' %}">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}" aria-label="{% trans 'Последняя' %}">
+                                    <span aria-hidden="true">&raquo;&raquo;</span>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </div>
+        {% endif %}
+    {% else %}
+        <div class="text-center py-5">
+            <div class="display-1 text-muted mb-3">
+                <i class="fas fa-file-alt"></i>
+            </div>
+            <h3>{% trans "Материалы не найдены" %}</h3>
+            <p class="text-muted">
+                {% if request.GET %}
+                    {% trans "По вашему запросу не найдено учебных материалов." %}
+                    <a href="{% url 'material-list' %}">{% trans "Сбросить фильтры" %}</a>
+                {% else %}
+                    {% trans "В системе пока нет учебных материалов." %}
+                {% endif %}
+            </p>
+            {% if user_role == 'doctor' %}
+            <div class="mt-3">
+                <a href="{% url 'material-create' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>{% trans "Добавить материал" %}
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %} 

@@ -1,0 +1,94 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% trans "Регистрация" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                <h2 class="text-center mb-4">{% trans "Регистрация" %}</h2>
+                
+                <div id="register-error" class="alert alert-danger d-none" role="alert"></div>
+                
+                {% if errors %}
+                <div class="alert alert-danger" role="alert">
+                    <ul class="mb-0">
+                        {% for error in errors %}
+                        <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                <form id="register-form" method="post" action="{% url 'register' %}">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="first_name" class="form-label">{% trans "Имя" %} *</label>
+                            <input type="text" class="form-control" id="first_name" name="first_name" required>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="last_name" class="form-label">{% trans "Фамилия" %} *</label>
+                            <input type="text" class="form-control" id="last_name" name="last_name" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="username" class="form-label">{% trans "Имя пользователя" %} *</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">{% trans "Email" %} *</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="password" class="form-label">{% trans "Пароль" %} *</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="password_confirm" class="form-label">{% trans "Подтверждение пароля" %} *</label>
+                            <input type="password" class="form-control" id="password_confirm" name="password_confirm" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="role" class="form-label">{% trans "Кем вы являетесь" %} *</label>
+                        <select class="form-select" id="role" name="role" required>
+                            <option value="" selected disabled>{% trans "Выберите роль" %}</option>
+                            <option value="doctor">{% trans "Врач" %}</option>
+                            <option value="student">{% trans "Студент" %}</option>
+                            <option value="parent">{% trans "Родитель" %}</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="terms_accepted" name="terms_accepted" required>
+                        <label class="form-check-label" for="terms_accepted">
+                            {% trans "Я согласен с" %} <a href="#">{% trans "условиями использования" %}</a>
+                        </label>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-user-plus me-2"></i>{% trans "Зарегистрироваться" %}
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="mt-4 text-center">
+                    <p>{% trans "Уже есть аккаунт?" %} <a href="{% url 'login' %}">{% trans "Войти" %}</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

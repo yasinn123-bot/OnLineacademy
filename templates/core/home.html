@@ -1,0 +1,189 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% trans "Главная" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="bg-primary text-white py-5 mb-5 rounded">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <h1 class="display-4 fw-bold mb-4">{% trans "Онлайн-академия детской онкологии и онкогематологии" %}</h1>
+                <p class="lead mb-4">{% trans "Платформа для обучения врачей, студентов и родителей основам детской онкологии и онкогематологии" %}</p>
+                <div class="mb-4">
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'dashboard' %}" class="btn btn-light btn-lg me-2">
+                            <i class="fas fa-user-graduate me-2"></i>{% trans "Личный кабинет" %}
+                        </a>
+                    {% else %}
+                        <a href="{% url 'register' %}" class="btn btn-light btn-lg me-2">
+                            <i class="fas fa-user-plus me-2"></i>{% trans "Присоединиться" %}
+                        </a>
+                    {% endif %}
+                    <a href="{% url 'course-list' %}" class="btn btn-outline-light btn-lg">
+                        <i class="fas fa-book me-2"></i>{% trans "Курсы" %}
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <img src="{% static 'images/hero-image.jpg' %}" alt="{% trans 'Онлайн-академия' %}" class="img-fluid rounded shadow">
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Featured Courses -->
+<section class="mb-5">
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2 class="text-center mb-4">{% trans "Избранные курсы" %}</h2>
+            </div>
+        </div>
+        
+        <div class="row">
+            {% if featured_courses %}
+                {% for course in featured_courses %}
+                    <div class="col-md-6 col-lg-4 mb-4">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ course.title }}</h5>
+                                <p class="card-text text-muted">
+                                    <i class="fas fa-globe me-1"></i> {{ course.get_language_display }}
+                                </p>
+                                <p class="card-text">{{ course.description|truncatewords:20 }}</p>
+                            </div>
+                            <div class="card-footer bg-transparent border-top-0">
+                                <a href="{% url 'course-detail' course.pk %}" class="btn btn-outline-primary">
+                                    {% trans "Подробнее" %}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-12 text-center">
+                    <p>{% trans "Курсы скоро появятся. Пожалуйста, заходите позже." %}</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="mb-5 py-5 bg-light rounded">
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <h2 class="mb-4">{% trans "Что предлагает Онлайн-академия" %}</h2>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-video fa-3x text-primary"></i>
+                        </div>
+                        <h5 class="card-title">{% trans "Видеолекции и презентации" %}</h5>
+                        <p class="card-text">{% trans "Доступ к высококачественным учебным материалам от ведущих специалистов в области детской онкологии." %}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-book-medical fa-3x text-primary"></i>
+                        </div>
+                        <h5 class="card-title">{% trans "Библиотека документов" %}</h5>
+                        <p class="card-text">{% trans "Протоколы, исследования и рекомендации для профессионального развития и практического применения." %}</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body text-center">
+                        <div class="mb-3">
+                            <i class="fas fa-certificate fa-3x text-primary"></i>
+                        </div>
+                        <h5 class="card-title">{% trans "Сертификация" %}</h5>
+                        <p class="card-text">{% trans "Проходите тестирование и получайте сертификаты, подтверждающие ваши знания и компетенции." %}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- User Roles Section -->
+<section class="mb-5">
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12 text-center">
+                <h2 class="mb-4">{% trans "Для кого создана Академия" %}</h2>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 border-primary border-top-0 border-end-0 border-bottom-0 border-5 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-user-md text-primary me-2"></i>{% trans "Врачи" %}
+                        </h5>
+                        <p class="card-text">{% trans "Повышение квалификации, доступ к последним исследованиям и протоколам лечения, обмен опытом с коллегами." %}</p>
+                        <a href="{% url 'register' %}" class="btn btn-outline-primary">{% trans "Присоединиться" %}</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 border-success border-top-0 border-end-0 border-bottom-0 border-5 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-user-graduate text-success me-2"></i>{% trans "Студенты" %}
+                        </h5>
+                        <p class="card-text">{% trans "Доступ к качественному образовательному контенту, возможность получить сертификат и углубить знания в области детской онкологии." %}</p>
+                        <a href="{% url 'register' %}" class="btn btn-outline-success">{% trans "Начать обучение" %}</a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4 mb-4">
+                <div class="card h-100 border-info border-top-0 border-end-0 border-bottom-0 border-5 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="fas fa-users text-info me-2"></i>{% trans "Родители" %}
+                        </h5>
+                        <p class="card-text">{% trans "Надежная информация, необходимая для понимания диагнозов и методов лечения, общение с профессионалами и другими семьями." %}</p>
+                        <a href="{% url 'register' %}" class="btn btn-outline-info">{% trans "Получить доступ" %}</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action -->
+<section class="bg-primary text-white py-5 rounded">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-8 mx-auto text-center">
+                <h2 class="mb-4">{% trans "Присоединяйтесь к Онлайн-академии сегодня" %}</h2>
+                <p class="lead mb-4">{% trans "Стань частью сообщества, объединенного целью спасать детские жизни через образование и совместную работу." %}</p>
+                {% if not user.is_authenticated %}
+                    <a href="{% url 'register' %}" class="btn btn-light btn-lg">{% trans "Зарегистрироваться" %}</a>
+                {% else %}
+                    <a href="{% url 'course-list' %}" class="btn btn-light btn-lg">{% trans "Изучить курсы" %}</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %} 

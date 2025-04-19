@@ -1,0 +1,176 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% trans "Редактировать тест" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'quiz:quiz_list' %}">{% trans "Тесты" %}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'quiz:quiz_detail' quiz.id %}">{{ quiz.title }}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{% trans "Редактировать" %}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">{% trans "Редактировать тест" %}</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <div class="mb-3">
+                            <label for="title" class="form-label">{% trans "Название теста" %}*</label>
+                            <input type="text" class="form-control" id="title" name="title" value="{{ quiz.title }}" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="description" class="form-label">{% trans "Описание" %}</label>
+                            <textarea class="form-control" id="description" name="description" rows="4">{{ quiz.description }}</textarea>
+                            <small class="form-text text-muted">{% trans "Опишите, о чем этот тест, какие знания он проверяет." %}</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="course" class="form-label">{% trans "Курс" %}</label>
+                            <select class="form-select" id="course" name="course">
+                                <option value="">{% trans "Выберите курс" %} ({% trans "не обязательно" %})</option>
+                                {% for course in courses %}
+                                    <option value="{{ course.id }}" {% if quiz.course and quiz.course.id == course.id %}selected{% endif %}>{{ course.title }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="form-text text-muted">{% trans "Вы можете привязать тест к конкретному курсу или оставить его как отдельное задание." %}</small>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="time_limit" class="form-label">{% trans "Ограничение по времени (мин.)" %}</label>
+                                <input type="number" class="form-control" id="time_limit" name="time_limit" value="{{ quiz.time_limit }}" min="1" max="180">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="passing_score" class="form-label">{% trans "Проходной балл (%)" %}</label>
+                                <input type="number" class="form-control" id="passing_score" name="passing_score" value="{{ quiz.passing_score }}" min="1" max="100">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4 form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="is_published" name="is_published" {% if quiz.is_published %}checked{% endif %}>
+                            <label class="form-check-label" for="is_published">{% trans "Опубликовать (тест будет доступен всем пользователям)" %}</label>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-between">
+                            <a href="{% url 'quiz:quiz_detail' quiz.id %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>{% trans "Отмена" %}
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                                <i class="fas fa-save me-2"></i>{% trans "Сохранить изменения" %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="card shadow mt-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">{% trans "Вопросы" %}</h4>
+                    <a href="{% url 'quiz:add_question' quiz.id %}" class="btn btn-light btn-sm">
+                        <i class="fas fa-plus me-1"></i> {% trans "Добавить вопрос" %}
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if quiz.questions.all %}
+                        <div class="list-group">
+                            {% for question in quiz.questions.all %}
+                                <div class="list-group-item list-group-item-action">
+                                    <div class="d-flex w-100 justify-content-between">
+                                        <h5 class="mb-1">{{ forloop.counter }}. {{ question.text }}</h5>
+                                        <div>
+                                            <a href="{% url 'quiz:edit_question' question.id %}" class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            <a href="{% url 'quiz:delete_question' question.id %}" class="btn btn-outline-danger btn-sm" 
+                                               onclick="return confirm('{% trans "Вы уверены что хотите удалить этот вопрос?" %}')">
+                                                <i class="fas fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <p class="mb-1">
+                                        <span class="badge {% if question.question_type == 'single' %}bg-success{% elif question.question_type == 'multiple' %}bg-primary{% else %}bg-warning{% endif %}">
+                                            {% if question.question_type == 'single' %}
+                                                {% trans "Один вариант" %}
+                                            {% elif question.question_type == 'multiple' %}
+                                                {% trans "Несколько вариантов" %}
+                                            {% else %}
+                                                {% trans "Короткий ответ" %}
+                                            {% endif %}
+                                        </span>
+                                        <span class="ms-2 badge bg-secondary">{{ question.points }} {% trans "баллов" %}</span>
+                                    </p>
+                                    
+                                    {% if question.question_type != 'short_answer' %}
+                                        <div class="mt-2">
+                                            <small>{% trans "Варианты ответов:" %}</small>
+                                            <ul class="list-group mt-1">
+                                                {% for choice in question.choices.all %}
+                                                    <li class="list-group-item py-1 {% if choice.is_correct %}list-group-item-success{% endif %}">
+                                                        {{ choice.text }}
+                                                        {% if choice.is_correct %}<span class="badge bg-success ms-2">{% trans "Верный" %}</span>{% endif %}
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        </div>
+                                    {% else %}
+                                        <div class="mt-2">
+                                            <small>{% trans "Правильный ответ:" %}</small>
+                                            <div class="alert alert-success py-1 mt-1">{{ question.answer_text }}</div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            {% trans "У теста пока нет вопросов. Добавьте хотя бы один вопрос, чтобы тест можно было проходить." %}
+                        </div>
+                        <div class="text-center">
+                            <a href="{% url 'quiz:add_question' quiz.id %}" class="btn btn-primary">
+                                <i class="fas fa-plus me-2"></i>{% trans "Добавить первый вопрос" %}
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+                {% if quiz.questions.all %}
+                <div class="card-footer bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="badge bg-secondary">{{ quiz.questions.count }} {% trans "вопросов" %}</span>
+                            <span class="badge bg-info ms-2">{{ quiz.total_points }} {% trans "баллов всего" %}</span>
+                        </div>
+                        <a href="{% url 'quiz:add_question' quiz.id %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus me-1"></i> {% trans "Добавить вопрос" %}
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

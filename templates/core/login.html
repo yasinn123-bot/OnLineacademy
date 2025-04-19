@@ -1,0 +1,54 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% trans "Вход" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow">
+            <div class="card-body p-5">
+                <h2 class="text-center mb-4">{% trans "Вход в личный кабинет" %}</h2>
+                
+                {% if form.errors %}
+                <div class="alert alert-danger" role="alert">
+                    {% trans "Неверное имя пользователя или пароль" %}
+                </div>
+                {% endif %}
+                
+                <form method="post" action="{% url 'login' %}">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="username" class="form-label">{% trans "Имя пользователя" %}</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">{% trans "Пароль" %}</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    
+                    {% if next %}
+                    <input type="hidden" name="next" value="{{ next }}">
+                    {% endif %}
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-sign-in-alt me-2"></i>{% trans "Войти" %}
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="mt-4 text-center">
+                    <p>{% trans "Еще нет аккаунта?" %} <a href="{% url 'register' %}">{% trans "Зарегистрироваться" %}</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% endblock %} 

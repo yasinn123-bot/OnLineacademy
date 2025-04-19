@@ -1,0 +1,180 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% trans "Сертификат" %} - {{ certificate.course.title }} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #certificate-container, #certificate-container * {
+            visibility: visible;
+        }
+        #certificate-container {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print {
+            display: none !important;
+        }
+    }
+    
+    .certificate-frame {
+        border: 15px solid #0d6efd;
+        padding: 20px;
+        position: relative;
+        background-color: #fff;
+    }
+    
+    .certificate-frame::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border: 2px solid #0d6efd;
+        margin: 10px;
+        pointer-events: none;
+    }
+    
+    .certificate-logo {
+        max-width: 100px;
+        margin-bottom: 20px;
+    }
+    
+    .certificate-title {
+        font-size: 36px;
+        color: #0d6efd;
+        margin-bottom: 30px;
+        font-weight: 600;
+    }
+    
+    .certificate-content {
+        font-size: 18px;
+        line-height: 1.6;
+        margin-bottom: 30px;
+    }
+    
+    .certificate-footer {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 50px;
+        border-top: 1px solid #ddd;
+        padding-top: 20px;
+    }
+    
+    .certificate-verify {
+        text-align: center;
+        font-size: 14px;
+        color: #6c757d;
+        margin-top: 20px;
+    }
+    
+    .certificate-seal {
+        position: absolute;
+        bottom: 70px;
+        right: 40px;
+        opacity: 0.2;
+        width: 150px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mb-4">
+    <div class="row mb-4 no-print">
+        <div class="col-md-8">
+            <h1 class="mb-0">{% trans "Сертификат" %}</h1>
+            <p class="lead">{{ certificate.course.title }}</p>
+        </div>
+        <div class="col-md-4 text-md-end">
+            <button class="btn btn-primary me-2" onclick="window.print()">
+                <i class="fas fa-print me-2"></i>{% trans "Распечатать" %}
+            </button>
+            <a href="{% url 'certificate-list' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left me-2"></i>{% trans "Назад к списку" %}
+            </a>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <div id="certificate-container">
+                <div class="certificate-frame my-4">
+                    <div class="text-center">
+                        <img src="{% static 'images/logo.png' %}" alt="Logo" class="certificate-logo">
+                        <h1 class="certificate-title">{% trans "СЕРТИФИКАТ" %}</h1>
+                        
+                        <div class="certificate-content">
+                            <p>{% trans "Настоящий сертификат подтверждает, что" %}</p>
+                            <h2 class="mb-4">{{ certificate.user.get_full_name }}</h2>
+                            <p>{% trans "успешно завершил(а) курс" %}</p>
+                            <h3 class="mb-4">{{ certificate.course.title }}</h3>
+                            <p>{% trans "в Онлайн-академии детской онкологии и онкогематологии" %}</p>
+                            <p>{% trans "с результатом" %} <strong>{{ certificate.score|floatformat:1 }}%</strong></p>
+                        </div>
+                        
+                        <div class="certificate-footer">
+                            <div class="text-start">
+                                <p class="mb-0">{% trans "Дата выдачи" %}:</p>
+                                <p><strong>{{ certificate.issued_at|date:"d.m.Y" }}</strong></p>
+                            </div>
+                            <div class="text-end">
+                                <p class="mb-0">{% trans "Подпись" %}:</p>
+                                <p><strong>_________________</strong></p>
+                            </div>
+                        </div>
+                        
+                        <div class="certificate-verify">
+                            <p class="mb-0">{% trans "Сертификат можно проверить по ID" %}: {{ certificate.certificate_id }}</p>
+                            <p class="mb-0">{% trans "на сайте" %} oncology-academy.org</p>
+                        </div>
+                    </div>
+                    
+                    <img src="{% static 'images/seal.png' %}" alt="Seal" class="certificate-seal">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4 no-print">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">{% trans "Информация о сертификате" %}</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <tr>
+                            <th>{% trans "Курс" %}</th>
+                            <td>{{ certificate.course.title }}</td>
+                        </tr>
+                        <tr>
+                            <th>{% trans "Получатель" %}</th>
+                            <td>{{ certificate.user.get_full_name }}</td>
+                        </tr>
+                        <tr>
+                            <th>{% trans "Дата выдачи" %}</th>
+                            <td>{{ certificate.issued_at|date:"d.m.Y" }}</td>
+                        </tr>
+                        <tr>
+                            <th>{% trans "Результат" %}</th>
+                            <td>{{ certificate.score|floatformat:1 }}%</td>
+                        </tr>
+                        <tr>
+                            <th>{% trans "ID сертификата" %}</th>
+                            <td>{{ certificate.certificate_id }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

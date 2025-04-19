@@ -1,0 +1,90 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% trans "Курсы" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <h1 class="mb-3">{% trans "Доступные курсы" %}</h1>
+            <p class="lead">{% trans "Изучайте курсы по детской онкологии и онкогематологии от ведущих экспертов в области." %}</p>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="card-title mb-0">{% trans "Фильтры" %}</h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="{% url 'course-list' %}">
+                        <div class="mb-3">
+                            <label for="language" class="form-label">{% trans "Язык" %}</label>
+                            <select class="form-select" id="language" name="language">
+                                <option value="">{% trans "Все языки" %}</option>
+                                <option value="ru" {% if request.GET.language == 'ru' %}selected{% endif %}>{% trans "Русский" %}</option>
+                                <option value="en" {% if request.GET.language == 'en' %}selected{% endif %}>{% trans "Английский" %}</option>
+                                <option value="ky" {% if request.GET.language == 'ky' %}selected{% endif %}>{% trans "Кыргызский" %}</option>
+                            </select>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-filter me-2"></i>{% trans "Применить" %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        {% if courses %}
+            {% for course in courses %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100 shadow-sm">
+                        {% if course.author.profile_picture %}
+                            <img src="{{ course.author.profile_picture.url }}" class="card-img-top" alt="{{ course.title }}">
+                        {% else %}
+                            <div class="bg-light text-center py-5">
+                                <i class="fas fa-book-medical fa-4x text-primary"></i>
+                            </div>
+                        {% endif %}
+                        
+                        <div class="card-body">
+                            <h5 class="card-title">{{ course.title }}</h5>
+                            <p class="card-text text-muted small mb-2">
+                                <i class="fas fa-user me-1"></i> {{ course.author.get_full_name }}
+                                <span class="mx-2">|</span>
+                                <i class="fas fa-globe me-1"></i> {{ course.get_language_display }}
+                            </p>
+                            <p class="card-text">{{ course.description|truncatewords:20 }}</p>
+                        </div>
+                        
+                        <div class="card-footer bg-white border-top-0">
+                            <div class="d-grid">
+                                <a href="{% url 'course-detail' course.id %}" class="btn btn-outline-primary">
+                                    <i class="fas fa-info-circle me-2"></i>{% trans "Подробнее" %}
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    {% if request.GET.language %}
+                        {% trans "Курсы на выбранном языке не найдены. Попробуйте выбрать другой язык или сбросить фильтры." %}
+                    {% else %}
+                        {% trans "В настоящее время нет доступных курсов. Пожалуйста, проверьте позже." %}
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %} 
