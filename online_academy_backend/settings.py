@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'core',
     'medical',
     'certificate',
+    'quiz',
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_simplejwt',
