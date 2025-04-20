@@ -1,0 +1,571 @@
+{% extends 'core/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Личный кабинет врача" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">{% trans "Личный кабинет врача" %}</h1>
+    
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">{% trans "Меню" %}</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    <a href="#overview" class="list-group-item list-group-item-action">{% trans "Обзор" %}</a>
+                    <a href="#courses" class="list-group-item list-group-item-action">{% trans "Мои курсы" %}</a>
+                    <a href="#patients" class="list-group-item list-group-item-action">{% trans "Пациенты" %}</a>
+                    <a href="#medicalHistory" class="list-group-item list-group-item-action">{% trans "История болезней" %}</a>
+                    <a href="#references" class="list-group-item list-group-item-action">{% trans "Справочники" %}</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main content -->
+        <div class="col-md-9">
+            <!-- Overview Section -->
+            <section id="overview" class="mb-5">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">{% trans "Обзор" %}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>{% trans "Персональная информация" %}:</h6>
+                                <p><strong>{% trans "ФИО" %}:</strong> {{ user.last_name }} {{ user.first_name }}</p>
+                                <p><strong>{% trans "Направление" %}:</strong> Онкология и гематология</p>
+                                <p><strong>{% trans "Квалификация" %}:</strong> Высшая категория</p>
+                                <p><strong>{% trans "Стаж" %}:</strong> 10 лет</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>{% trans "Статистика" %}:</h6>
+                                <p><strong>{% trans "Активных курсов" %}:</strong> {{ created_courses|length }}</p>
+                                <p><strong>{% trans "Активных пациентов" %}:</strong> 12</p>
+                                <p><strong>{% trans "Вылеченных пациентов" %}:</strong> 45</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Courses Section -->
+            <section id="courses" class="mb-5">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">{% trans "Мои курсы" %}</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if created_courses %}
+                            <div class="row">
+                                {% for course in created_courses %}
+                                    <div class="col-md-6 mb-4">
+                                        <div class="card h-100">
+                                            <div class="card-body">
+                                                <h5 class="card-title">{{ course.title }}</h5>
+                                                <p class="card-text">{{ course.description|truncatewords:15 }}</p>
+                                                <div class="d-flex justify-content-between align-items-center">
+                                                    <a href="{% url 'course-detail' course.id %}" class="btn btn-sm btn-outline-primary">{% trans "Просмотр" %}</a>
+                                                    <span class="badge bg-info">{{ course.get_language_display }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-center">{% trans "У вас пока нет созданных курсов." %}</p>
+                            <div class="text-center">
+                                <a href="{% url 'course-create' %}" class="btn btn-primary">
+                                    <i class="fas fa-plus-circle me-2"></i>{% trans "Создать курс" %}
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Patients Section -->
+            <section id="patients" class="mb-5">
+                <div class="card">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">{% trans "Пациенты" %}</h5>
+                        <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#patientStructureModal">
+                            <i class="fas fa-info-circle"></i> {% trans "Структура данных" %}
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>{% trans "ФИО" %}</th>
+                                        <th>{% trans "Контакты" %}</th>
+                                        <th>{% trans "Действия" %}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>1</td>
+                                        <td>Иванов Иван Иванович</td>
+                                        <td>+996 700 123 456</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>2</td>
+                                        <td>Петров Петр Петрович</td>
+                                        <td>+996 700 234 567</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-secondary">
+                                                <i class="fas fa-edit"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Medical History Section -->
+            <section id="medicalHistory" class="mb-5">
+                <div class="card">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">{% trans "История болезней" %}</h5>
+                        <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#medicalHistoryStructureModal">
+                            <i class="fas fa-info-circle"></i> {% trans "Структура данных" %}
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>{% trans "Пациент" %}</th>
+                                        <th>{% trans "Болезнь" %}</th>
+                                        <th>{% trans "Статус" %}</th>
+                                        <th>{% trans "Действия" %}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Иванов Иван Иванович</td>
+                                        <td>Лейкемия</td>
+                                        <td><span class="badge bg-warning">DuringTreatment</span></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-success">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Петров Петр Петрович</td>
+                                        <td>Анемия</td>
+                                        <td><span class="badge bg-success">Cured</span></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-primary">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- References Section -->
+            <section id="references" class="mb-5">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">{% trans "Справочники" %}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-4">
+                                <div class="card h-100">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="card-title mb-0">{% trans "Перечисления" %}</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <h6>enum_DiseaseStatuses</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered">
+                                                <thead>
+                                                    <tr>
+                                                        <th>№</th>
+                                                        <th>{% trans "Числовое значение" %}</th>
+                                                        <th>{% trans "Название поля" %}</th>
+                                                        <th>{% trans "Описание" %}</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td>1</td>
+                                                        <td>0</td>
+                                                        <td>Cured</td>
+                                                        <td>{% trans "Статус для вылеченных болезней" %}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>2</td>
+                                                        <td>1</td>
+                                                        <td>DuringTreatment</td>
+                                                        <td>{% trans "В процессе лечения" %}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-4">
+                                <div class="card h-100">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="card-title mb-0">{% trans "Болезни" %}</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <h6>dcr_Disease</h6>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-bordered">
+                                                <thead>
+                                                    <tr>
+                                                        <th>№</th>
+                                                        <th>{% trans "Тип данных" %}</th>
+                                                        <th>{% trans "Название поля" %}</th>
+                                                        <th>{% trans "Описание" %}</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr>
+                                                        <td>1</td>
+                                                        <td>int32</td>
+                                                        <td>ID</td>
+                                                        <td>{% trans "Уникальный идентификатор" %}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>2</td>
+                                                        <td>string(50)</td>
+                                                        <td>Name</td>
+                                                        <td>{% trans "Название" %}</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td>3</td>
+                                                        <td>string(500)</td>
+                                                        <td>Desc</td>
+                                                        <td>{% trans "Описание" %}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<!-- Structure Modals -->
+<!-- Patient Structure Modal -->
+<div class="modal fade" id="patientStructureModal" tabindex="-1" aria-labelledby="patientStructureModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="patientStructureModalLabel">{% trans "Структура данных пациентов" %}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6>{% trans "Базовый справочник" %}: {% trans "Пользователь" %}</h6>
+                <p>dcr_User</p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>{% trans "Тип данных" %}</th>
+                                <th>{% trans "Название поля" %}</th>
+                                <th>{% trans "Описание" %}</th>
+                                <th>{% trans "Свойства" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>int32</td>
+                                <td>ID</td>
+                                <td>{% trans "Уникальный идентификатор" %}</td>
+                                <td>{% trans "Обязательный (PK)" %}</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>string(50)</td>
+                                <td>Name</td>
+                                <td>{% trans "Имя пользователь" %}</td>
+                                <td>{% trans "Обязательный" %}</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>string(50)</td>
+                                <td>SecondName</td>
+                                <td>{% trans "Фамилия пользователя" %}</td>
+                                <td>{% trans "Обязательный" %}</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>string(50)</td>
+                                <td>MiddleName</td>
+                                <td>{% trans "Отчество пользователя" %}</td>
+                                <td>{% trans "Необязательный" %}</td>
+                            </tr>
+                            <tr>
+                                <td>5</td>
+                                <td>string(50)</td>
+                                <td>Login</td>
+                                <td>{% trans "Логин" %}</td>
+                                <td>{% trans "Обязательный, Уникальный" %}</td>
+                            </tr>
+                            <tr>
+                                <td>6</td>
+                                <td>string(256)</td>
+                                <td>HashPass</td>
+                                <td>{% trans "Хеш пароля" %}</td>
+                                <td>{% trans "Обязательный" %}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h6 class="mt-4">{% trans "Справочник" %}: {% trans "Пациенты" %} ({% trans "наследуется от Пользователь" %})</h6>
+                <p>dcr_Patients</p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>{% trans "Тип данных" %}</th>
+                                <th>{% trans "Название поля" %}</th>
+                                <th>{% trans "Описание" %}</th>
+                                <th>{% trans "Свойства" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>int32</td>
+                                <td>UserID</td>
+                                <td>{% trans "Ссылка на Пользователь" %}</td>
+                                <td>{% trans "Обязательный (PK), (FK)" %}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h6 class="mt-4">{% trans "Справочник" %}: {% trans "Контакты" %}</h6>
+                <p>dcr_Contacts</p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>{% trans "Тип данных" %}</th>
+                                <th>{% trans "Название поля" %}</th>
+                                <th>{% trans "Описание" %}</th>
+                                <th>{% trans "Свойства" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>int32</td>
+                                <td>UserID</td>
+                                <td>{% trans "Ссылка на Пользователь" %}</td>
+                                <td>{% trans "Обязательный (PK), (FK)" %}</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>string(50)</td>
+                                <td>Code</td>
+                                <td>{% trans "Код контакта" %}</td>
+                                <td>{% trans "Обязательный" %}</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>string(50)</td>
+                                <td>Value</td>
+                                <td>{% trans "Контакт" %}</td>
+                                <td>{% trans "Обязательный" %}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Закрыть" %}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Medical History Structure Modal -->
+<div class="modal fade" id="medicalHistoryStructureModal" tabindex="-1" aria-labelledby="medicalHistoryStructureModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="medicalHistoryStructureModalLabel">{% trans "Структура данных истории болезней" %}</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6>{% trans "Справочник" %}: {% trans "История болезней" %}</h6>
+                <p>dcr_MedicalHistory</p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>{% trans "Тип данных" %}</th>
+                                <th>{% trans "Название поля" %}</th>
+                                <th>{% trans "Описание" %}</th>
+                                <th>{% trans "Свойства" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>int32</td>
+                                <td>PatientID</td>
+                                <td>{% trans "Ссылка на Пациентов" %}</td>
+                                <td>{% trans "Обязательный (PK), (FK)" %}</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>int32</td>
+                                <td>DiseaseID</td>
+                                <td>{% trans "Ссылка на Болезни" %}</td>
+                                <td>{% trans "Обязательный (FK)" %}</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>int32</td>
+                                <td>DoctorID</td>
+                                <td>{% trans "Ссылка на Врачей" %}</td>
+                                <td>{% trans "Лечащий врач" %}</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>enum_DiseaseStatuses</td>
+                                <td>DiseaseStatuses</td>
+                                <td>{% trans "Статусы болезней" %}</td>
+                                <td>{% trans "Обязательный" %}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h6 class="mt-4">{% trans "Справочник" %}: {% trans "Врач" %} ({% trans "наследуется от Пользователь" %})</h6>
+                <p>dcr_Doctor</p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>{% trans "Тип данных" %}</th>
+                                <th>{% trans "Название поля" %}</th>
+                                <th>{% trans "Описание" %}</th>
+                                <th>{% trans "Свойства" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>int32</td>
+                                <td>UserID</td>
+                                <td>{% trans "Ссылка на Пользователь" %}</td>
+                                <td>{% trans "Обязательный (PK), (FK)" %}</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>int32</td>
+                                <td>DirectionID</td>
+                                <td>{% trans "Ссылка на Направление" %}</td>
+                                <td>{% trans "Обязательный (FK)" %}</td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>string(100)</td>
+                                <td>Qualification</td>
+                                <td>{% trans "Квалификация" %}</td>
+                                <td>{% trans "Обязательный" %}</td>
+                            </tr>
+                            <tr>
+                                <td>4</td>
+                                <td>int32</td>
+                                <td>ExperienceYears</td>
+                                <td>{% trans "Стаж (в годах)" %}</td>
+                                <td>{% trans "Обязательный" %}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <h6 class="mt-4">{% trans "Справочник" %}: {% trans "Направление" %}</h6>
+                <p>dcr_Specialization</p>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>№</th>
+                                <th>{% trans "Тип данных" %}</th>
+                                <th>{% trans "Название поля" %}</th>
+                                <th>{% trans "Описание" %}</th>
+                                <th>{% trans "Свойства" %}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>int32</td>
+                                <td>ID</td>
+                                <td>{% trans "Уникальный идентификатор" %}</td>
+                                <td>{% trans "Обязательный (PK)" %}</td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>string(50)</td>
+                                <td>Name</td>
+                                <td>{% trans "Название (хирургия, терапия и т.п.)" %}</td>
+                                <td>{% trans "Обязательный" %}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Закрыть" %}</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

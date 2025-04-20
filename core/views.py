@@ -433,11 +433,14 @@ def dashboard(request):
     cached_context = cache.get(cache_key)
     
     if cached_context:
+        # For doctor role, render the doctor-specific template
+        if user_role == 'doctor':
+            return render(request, 'core/doctor_dashboard.html', cached_context)
         return render(request, 'core/dashboard.html', cached_context)
     
     # Different dashboard content based on role
     if user_role == 'doctor':
-        # For doctors: show their created courses and materials
+        # For doctors: show their created courses and materials and the specialized dashboard
         # Only fetch what's visible on the dashboard
         courses_count = Course.objects.filter(author=user).count()
         
@@ -456,6 +459,13 @@ def dashboard(request):
                 'courses_count': 0, 
                 'user_role': user_role,
             }
+        
+        # Cache for 5 minutes
+        cache.set(cache_key, context, 60 * 5)
+        
+        # Return the doctor-specific dashboard
+        return render(request, 'core/doctor_dashboard.html', context)
+        
     elif user_role == 'student' or user_role == 'parent':
         # For students/parents: show their enrolled courses and progress
         enrolled_courses = Course.objects.filter(user_progress__user=user).select_related('author')
