@@ -513,13 +513,33 @@ def course_detail(request, pk):
         ).prefetch_related('materials_completed', 'tests_completed').first()
         is_enrolled = user_progress is not None
     
+    # Import Quiz model here to avoid circular imports
+    from quiz.models import Quiz, QuizAttempt
+    
+    # Get quizzes for this course
+    quizzes = Quiz.objects.filter(course=course).prefetch_related('questions')
+    
+    # Check for completed quizzes
+    completed_quizzes = {}
+    if is_enrolled and request.user.is_authenticated:
+        # Get all passed attempts
+        passed_attempts = QuizAttempt.objects.filter(
+            user=request.user,
+            quiz__in=quizzes,
+            passed=True
+        ).values_list('quiz_id', flat=True)
+        
+        # Mark quizzes as completed
+        completed_quizzes = {quiz_id: True for quiz_id in passed_attempts}
+    
     context = {
         'course': course,
         'materials': Material.objects.filter(course=course).select_related('author'),
-        'tests': Test.objects.filter(course=course).prefetch_related('questions'),
+        'tests': quizzes,
         'is_enrolled': is_enrolled,
         'user_progress': user_progress,
         'user_role': user_role,
+        'completed_quizzes': completed_quizzes
     }
     
     # Cache for 5 minutes

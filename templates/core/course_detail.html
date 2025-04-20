@@ -121,11 +121,11 @@
                                     
                                     <div>
                                         {% if is_enrolled %}
-                                            {% if test in user_progress.tests_completed.all %}
+                                            {% if test.id in completed_quizzes %}
                                                 <span class="badge bg-success me-2">{% trans "Пройден" %}</span>
                                             {% endif %}
-                                            <a href="{% url 'test-detail' test.id %}" class="btn btn-outline-primary btn-sm">
-                                                {% if test in user_progress.tests_completed.all %}
+                                            <a href="{% url 'quiz:quiz_detail' test.id %}" class="btn btn-outline-primary btn-sm">
+                                                {% if test.id in completed_quizzes %}
                                                     <i class="fas fa-redo me-1"></i>{% trans "Пройти снова" %}
                                                 {% else %}
                                                     <i class="fas fa-edit me-1"></i>{% trans "Начать тест" %}
@@ -232,7 +232,7 @@
                             <p class="small text-muted mb-3">{{ completed_materials }}/{{ total_materials }} {% trans "материалов пройдено" %}</p>
                         {% endwith %}
                         
-                        {% with completed_tests=user_progress.tests_completed.count total_tests=tests|length %}
+                        {% with completed_tests=completed_quizzes|length total_tests=tests|length %}
                             <h6 class="mb-2">{% trans "Тесты" %}</h6>
                             <div class="progress mb-3">
                                 <div class="progress-bar bg-success" 
