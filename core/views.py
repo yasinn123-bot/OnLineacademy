@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.db.models import Q
+from django.db.models import Q, Count, Prefetch
 from django.http import HttpResponse, JsonResponse
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
@@ -10,6 +10,8 @@ from django.utils.translation import gettext as _
 from django.conf import settings
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.views.decorators.cache import cache_page
+from django.core.cache import cache
 import uuid
 import json
 from django.contrib import messages
@@ -322,10 +324,11 @@ class UserProgressView(APIView):
         return Response(serializer.data)
 
 # Template-based Views
+@cache_page(60 * 5)  # Cache for 5 minutes
 def home(request):
     user_role = get_user_role(request.user)
-    # Get featured courses for homepage
-    featured_courses = Course.objects.filter(is_published=True).order_by('-created_at')[:6]
+    # Get featured courses for homepage with select_related for author
+    featured_courses = Course.objects.filter(is_published=True).select_related('author').order_by('-created_at')[:6]
     
     context = {
         'featured_courses': featured_courses,
@@ -425,37 +428,75 @@ def dashboard(request):
     user = request.user
     user_role = get_user_role(user)
     
+    # Cache key specific to this user
+    cache_key = f'dashboard_{user.id}'
+    cached_context = cache.get(cache_key)
+    
+    if cached_context:
+        return render(request, 'core/dashboard.html', cached_context)
+    
     # Different dashboard content based on role
     if user_role == 'doctor':
         # For doctors: show their created courses and materials
-        context = {
-            'created_courses': Course.objects.filter(author=user),
-            'created_materials': Material.objects.filter(author=user),
-            'user_role': user_role,
-        }
+        # Only fetch what's visible on the dashboard
+        courses_count = Course.objects.filter(author=user).count()
+        
+        if courses_count > 0:
+            # Only if there are courses, fetch the details with optimization
+            context = {
+                'created_courses': Course.objects.filter(author=user).select_related('author'),
+                'created_materials': Material.objects.filter(author=user).select_related('course'),
+                'courses_count': courses_count,
+                'user_role': user_role,
+            }
+        else:
+            # Don't waste resources fetching materials if no courses
+            context = {
+                'created_courses': [],
+                'courses_count': 0, 
+                'user_role': user_role,
+            }
     elif user_role == 'student' or user_role == 'parent':
         # For students/parents: show their enrolled courses and progress
-        enrolled_courses = Course.objects.filter(user_progress__user=user)
-        progress_data = UserProgress.objects.filter(user=user)
-        certificates = Certificate.objects.filter(user=user)
+        enrolled_courses = Course.objects.filter(user_progress__user=user).select_related('author')
         
-        context = {
-            'enrolled_courses': enrolled_courses,
-            'progress_data': progress_data,
-            'certificates': certificates,
-            'user_role': user_role,
-        }
+        # If user is enrolled in courses, fetch progress details
+        if enrolled_courses.exists():
+            progress_data = UserProgress.objects.filter(user=user).select_related('course').prefetch_related(
+                Prefetch('materials_completed', queryset=Material.objects.select_related('author')),
+                Prefetch('tests_completed', queryset=Test.objects.select_related('course'))
+            )
+            certificates = Certificate.objects.filter(user=user).select_related('course')
+            
+            context = {
+                'enrolled_courses': enrolled_courses,
+                'progress_data': progress_data,
+                'certificates': certificates,
+                'user_role': user_role,
+            }
+        else:
+            # Don't waste resources fetching progress if not enrolled
+            context = {
+                'enrolled_courses': [],
+                'user_role': user_role,
+            }
     else:
         # Fallback for any other role
         context = {
             'user_role': user_role,
         }
     
+    # Cache for 5 minutes
+    cache.set(cache_key, context, 60 * 5)
+    
     return render(request, 'core/dashboard.html', context)
 
+@cache_page(60 * 5)  # Cache for 5 minutes
 def course_list(request):
-    courses = Course.objects.filter(is_published=True)
     user_role = get_user_role(request.user)
+    
+    # Start with a base queryset with select_related for author
+    courses = Course.objects.filter(is_published=True).select_related('author')
     
     # Filter by language if specified
     language = request.GET.get('language')
@@ -469,7 +510,14 @@ def course_list(request):
     return render(request, 'core/course_list.html', context)
 
 def course_detail(request, pk):
-    course = get_object_or_404(Course, pk=pk)
+    # Try to get from cache first
+    cache_key = f'course_detail_{pk}_{request.user.id if request.user.is_authenticated else 0}'
+    cached_data = cache.get(cache_key)
+    
+    if cached_data:
+        return render(request, 'core/course_detail.html', cached_data)
+    
+    course = get_object_or_404(Course.objects.select_related('author'), pk=pk)
     user_role = get_user_role(request.user)
     
     # Check if the user is enrolled
@@ -479,33 +527,37 @@ def course_detail(request, pk):
     if request.user.is_authenticated:
         user_progress = UserProgress.objects.filter(
             user=request.user, course=course
-        ).first()
+        ).prefetch_related('materials_completed', 'tests_completed').first()
         is_enrolled = user_progress is not None
     
     context = {
         'course': course,
-        'materials': Material.objects.filter(course=course),
-        'tests': Test.objects.filter(course=course),
+        'materials': Material.objects.filter(course=course).select_related('author'),
+        'tests': Test.objects.filter(course=course).prefetch_related('questions'),
         'is_enrolled': is_enrolled,
         'user_progress': user_progress,
         'user_role': user_role,
     }
+    
+    # Cache for 5 minutes
+    cache.set(cache_key, context, 60 * 5)
+    
     return render(request, 'core/course_detail.html', context)
 
 @login_required
 def material_detail(request, pk):
-    material = get_object_or_404(Material, pk=pk)
+    material = get_object_or_404(Material.objects.select_related('author', 'course'), pk=pk)
     user_role = get_user_role(request.user)
     
-    # Get comments
-    comments = Comment.objects.filter(material=material, parent__isnull=True)
+    # Get comments with their authors
+    comments = Comment.objects.filter(material=material, parent__isnull=True).select_related('author')
     
     # Check if material is completed by user
     is_completed = False
     if request.user.is_authenticated and material.course:
         progress = UserProgress.objects.filter(
             user=request.user, course=material.course
-        ).first()
+        ).prefetch_related('materials_completed').first()
         if progress:
             is_completed = material in progress.materials_completed.all()
     
@@ -519,7 +571,7 @@ def material_detail(request, pk):
 
 @login_required
 def test_detail(request, pk):
-    test = get_object_or_404(Test, pk=pk)
+    test = get_object_or_404(Test.objects.select_related('course'), pk=pk)
     user_role = get_user_role(request.user)
     
     # Check if test is already completed
@@ -527,13 +579,16 @@ def test_detail(request, pk):
     if request.user.is_authenticated:
         progress = UserProgress.objects.filter(
             user=request.user, course=test.course
-        ).first()
+        ).prefetch_related('tests_completed').first()
         if progress:
             is_completed = test in progress.tests_completed.all()
     
+    # Prefetch questions with their answers
+    questions = Question.objects.filter(test=test).prefetch_related('answers')
+    
     context = {
         'test': test,
-        'questions': Question.objects.filter(test=test),
+        'questions': questions,
         'is_completed': is_completed,
         'user_role': user_role,
     }
@@ -606,7 +661,8 @@ class CourseListView(ListView):
     paginate_by = 12
     
     def get_queryset(self):
-        queryset = Course.objects.all()
+        # Start with select_related for better performance
+        queryset = Course.objects.all().select_related('author')
         
         # If user is not staff or doctor, only show published courses
         if not self.request.user.is_staff and get_user_role(self.request.user) != 'doctor':
@@ -680,7 +736,8 @@ class MaterialListView(ListView):
     paginate_by = 12
     
     def get_queryset(self):
-        queryset = Material.objects.all()
+        # Start with select_related for better performance
+        queryset = Material.objects.all().select_related('author', 'course')
         
         # Only doctors who created the materials can see unpublished ones
         user_role = get_user_role(self.request.user)

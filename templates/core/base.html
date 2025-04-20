@@ -1,5 +1,6 @@
 {% load static %}
 {% load i18n %}
+{% load cache %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -16,6 +17,7 @@
 </head>
 <body>
     <!-- Navigation -->
+    {% cache 600 nav_bar user.is_authenticated user.id user_role request.path CURRENT_LANGUAGE %}
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
             <a class="navbar-brand" href="{% url 'home' %}">
@@ -135,6 +137,7 @@
             </div>
         </div>
     </nav>
+    {% endcache %}
 
     <!-- Main Content -->
     <main class="container mt-4 mb-5">
@@ -155,6 +158,7 @@
     </main>
 
     <!-- Footer -->
+    {% cache 86400 footer %}
     <footer class="bg-dark text-white py-4 mt-auto">
         <div class="container">
             <div class="row">
@@ -185,6 +189,7 @@
             </div>
         </div>
     </footer>
+    {% endcache %}
 
     <!-- Bootstrap JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

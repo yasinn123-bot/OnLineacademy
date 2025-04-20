@@ -65,6 +65,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.gzip.GZipMiddleware',  # Compress all responses
 ]
 
 ROOT_URLCONF = 'online_academy_backend.urls'
@@ -80,6 +81,12 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+            ],
+            'loaders': [
+                ('django.template.loaders.cached.Loader', [
+                    'django.template.loaders.filesystem.Loader',
+                    'django.template.loaders.app_directories.Loader',
+                ]),
             ],
         },
     },
@@ -99,6 +106,16 @@ DATABASES = {
     )
 }
 
+# Database optimizations
+if not DEBUG:
+    # Persistent database connections - keeps connections alive between requests
+    DATABASES['default']['CONN_MAX_AGE'] = 60 * 5  # 5 minutes
+    
+    # Disable atomic requests for better performance when you manage transactions manually
+    DATABASES['default']['ATOMIC_REQUESTS'] = False
+    
+    # Use persistent connections in production
+    DATABASES['default']['CONN_HEALTH_CHECKS'] = True
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -150,6 +167,17 @@ STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 # Whitenoise settings for static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# Whitenoise settings
+WHITENOISE_MAX_AGE = 60 * 60 * 24 * 30  # 30 days
+WHITENOISE_MIMETYPES = {
+    'application/font-woff': 'application/octet-stream',
+    'application/font-woff2': 'application/octet-stream',
+    'application/vnd.ms-fontobject': 'application/octet-stream',
+    'application/x-font-ttf': 'application/octet-stream',
+    'font/opentype': 'application/octet-stream',
+    'image/svg+xml': 'image/svg+xml',
+}
+
 # Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
@@ -162,6 +190,32 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Custom user model
 AUTH_USER_MODEL = 'core.CustomUser'
 
+# Caching settings
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+        'TIMEOUT': 300,  # 5 minutes
+    }
+}
+
+# In production, use Redis or Memcached if available
+if not DEBUG:
+    # Check if we have a Redis URL from the environment
+    REDIS_URL = env('REDIS_URL', default=None)
+    if REDIS_URL:
+        CACHES['default'] = {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'PARSER_CLASS': 'redis.connection.HiredisParser',
+            }
+        }
+        # Use Redis for session cache
+        SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+        SESSION_CACHE_ALIAS = 'default'
+
 # Django REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -173,7 +227,30 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ],
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/day',
+        'user': '1000/day'
+    },
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser'
+    ],
 }
+
+# In production, disable the browsable API renderer for better performance
+if not DEBUG:
+    REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = [
+        'rest_framework.renderers.JSONRenderer',
+    ]
 
 # JWT Settings
 SIMPLE_JWT = {
