@@ -12,6 +12,7 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 import uuid
 import json
+from django.contrib import messages
 
 from rest_framework import viewsets, permissions, status, generics
 from rest_framework.views import APIView
@@ -582,6 +583,20 @@ def profile(request):
         'user_role': user_role,
     }
     return render(request, 'core/profile.html', context)
+
+@login_required
+def course_enroll(request, pk):
+    course = get_object_or_404(Course, pk=pk)
+    
+    # Check if user is already enrolled
+    if UserProgress.objects.filter(user=request.user, course=course).exists():
+        messages.info(request, _("Вы уже записаны на этот курс."))
+    else:
+        # Create progress record
+        UserProgress.objects.create(user=request.user, course=course)
+        messages.success(request, _("Вы успешно записались на курс."))
+    
+    return redirect('course-detail', pk=pk)
 
 # Course CRUD views for template-based UI
 class CourseListView(ListView):

@@ -1,0 +1,62 @@
+[
+    {
+        "model": "core.customuser",
+        "pk": 100,
+        "fields": {
+            "password": "pbkdf2_sha256$720000$KzbcQlhlfqWKJjqxLBX8CK$kQqS9vWQWYGWpg+8y+WvZkhtErdQTd1QVpEH4+fVdJY=",
+            "last_login": null,
+            "is_superuser": false,
+            "username": "student1",
+            "email": "student1@example.com",
+            "is_staff": false,
+            "is_active": true,
+            "date_joined": "2023-10-20T10:00:00Z",
+            "role": "student",
+            "first_name": "Student",
+            "last_name": "One",
+            "bio": "I am a pediatric resident interested in oncology.",
+            "groups": [],
+            "user_permissions": []
+        }
+    },
+    {
+        "model": "core.customuser",
+        "pk": 101,
+        "fields": {
+            "password": "pbkdf2_sha256$720000$KzbcQlhlfqWKJjqxLBX8CK$kQqS9vWQWYGWpg+8y+WvZkhtErdQTd1QVpEH4+fVdJY=",
+            "last_login": null,
+            "is_superuser": false,
+            "username": "student2",
+            "email": "student2@example.com",
+            "is_staff": false,
+            "is_active": true,
+            "date_joined": "2023-10-20T10:00:00Z",
+            "role": "student",
+            "first_name": "Student",
+            "last_name": "Two",
+            "bio": "I am a pediatric nurse specializing in cancer care.",
+            "groups": [],
+            "user_permissions": []
+        }
+    },
+    {
+        "model": "core.customuser",
+        "pk": 102,
+        "fields": {
+            "password": "pbkdf2_sha256$720000$KzbcQlhlfqWKJjqxLBX8CK$kQqS9vWQWYGWpg+8y+WvZkhtErdQTd1QVpEH4+fVdJY=",
+            "last_login": null,
+            "is_superuser": false,
+            "username": "student3",
+            "email": "student3@example.com",
+            "is_staff": false,
+            "is_active": true,
+            "date_joined": "2023-10-20T10:00:00Z",
+            "role": "student",
+            "first_name": "Student",
+            "last_name": "Three",
+            "bio": "Medical student with interest in pediatric hematology.",
+            "groups": [],
+            "user_permissions": []
+        }
+    }
+] 

@@ -35,6 +35,7 @@ urlpatterns = [
     path('courses/create/', views.CourseCreateView.as_view(), name='course-create'),
     path('courses/<int:pk>/update/', views.CourseUpdateView.as_view(), name='course-update'),
     path('courses/<int:pk>/delete/', views.CourseDeleteView.as_view(), name='course-delete'),
+    path('courses/<int:pk>/enroll/', views.course_enroll, name='course-enroll'),
     
     # Material URLs
     path('materials/', views.MaterialListView.as_view(), name='material-list'),
