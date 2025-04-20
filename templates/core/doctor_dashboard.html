@@ -7,6 +7,14 @@
 <div class="container">
     <h1 class="mb-4">{% trans "Личный кабинет врача" %}</h1>
     
+    {% if needs_profile %}
+        <div class="alert alert-warning">
+            <h4 class="alert-heading">{% trans "Профиль врача не заполнен" %}</h4>
+            <p>{% trans "Для полноценной работы с системой необходимо заполнить данные врача." %}</p>
+            <hr>
+            <a href="#" class="btn btn-primary">{% trans "Заполнить профиль" %}</a>
+        </div>
+    {% else %}
     <div class="row">
         <!-- Sidebar -->
         <div class="col-md-3">
@@ -37,15 +45,15 @@
                             <div class="col-md-6">
                                 <h6>{% trans "Персональная информация" %}:</h6>
                                 <p><strong>{% trans "ФИО" %}:</strong> {{ user.last_name }} {{ user.first_name }}</p>
-                                <p><strong>{% trans "Направление" %}:</strong> Онкология и гематология</p>
-                                <p><strong>{% trans "Квалификация" %}:</strong> Высшая категория</p>
-                                <p><strong>{% trans "Стаж" %}:</strong> 10 лет</p>
+                                <p><strong>{% trans "Направление" %}:</strong> {{ doctor.specialization.name }}</p>
+                                <p><strong>{% trans "Квалификация" %}:</strong> {{ doctor.qualification }}</p>
+                                <p><strong>{% trans "Стаж" %}:</strong> {{ doctor.experience_years }} {% trans "лет" %}</p>
                             </div>
                             <div class="col-md-6">
                                 <h6>{% trans "Статистика" %}:</h6>
-                                <p><strong>{% trans "Активных курсов" %}:</strong> {{ created_courses|length }}</p>
-                                <p><strong>{% trans "Активных пациентов" %}:</strong> 12</p>
-                                <p><strong>{% trans "Вылеченных пациентов" %}:</strong> 45</p>
+                                <p><strong>{% trans "Активных курсов" %}:</strong> {{ courses_count }}</p>
+                                <p><strong>{% trans "Активных пациентов" %}:</strong> {{ active_patients_count }}</p>
+                                <p><strong>{% trans "Вылеченных пациентов" %}:</strong> {{ cured_patients_count }}</p>
                             </div>
                         </div>
                     </div>
@@ -109,32 +117,27 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr>
-                                        <td>1</td>
-                                        <td>Иванов Иван Иванович</td>
-                                        <td>+996 700 123 456</td>
-                                        <td>
-                                            <button class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-secondary">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>2</td>
-                                        <td>Петров Петр Петрович</td>
-                                        <td>+996 700 234 567</td>
-                                        <td>
-                                            <button class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-secondary">
-                                                <i class="fas fa-edit"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
+                                    {% if patients %}
+                                        {% for patient in patients %}
+                                            <tr>
+                                                <td>{{ patient.id }}</td>
+                                                <td>{{ patient.name }}</td>
+                                                <td>{{ patient.contact }}</td>
+                                                <td>
+                                                    <a href="#" class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="#" class="btn btn-sm btn-outline-secondary">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="4" class="text-center">{% trans "У вас пока нет пациентов" %}</td>
+                                        </tr>
+                                    {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -163,29 +166,40 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr>
-                                        <td>Иванов Иван Иванович</td>
-                                        <td>Лейкемия</td>
-                                        <td><span class="badge bg-warning">DuringTreatment</span></td>
-                                        <td>
-                                            <button class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-success">
-                                                <i class="fas fa-check"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>Петров Петр Петрович</td>
-                                        <td>Анемия</td>
-                                        <td><span class="badge bg-success">Cured</span></td>
-                                        <td>
-                                            <button class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-eye"></i>
-                                            </button>
-                                        </td>
-                                    </tr>
+                                    {% if medical_histories %}
+                                        {% for history in medical_histories %}
+                                            <tr>
+                                                <td>{{ history.patient_name }}</td>
+                                                <td>{{ history.disease_name }}</td>
+                                                <td>
+                                                    {% if history.status == 0 %}
+                                                        <span class="badge bg-success">{{ history.status_display }}</span>
+                                                    {% elif history.status == 1 %}
+                                                        <span class="badge bg-warning">{{ history.status_display }}</span>
+                                                    {% else %}
+                                                        <span class="badge bg-secondary">{{ history.status_display }}</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <a href="#" class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    {% if history.status == 1 %}
+                                                        <form method="post" action="{% url 'mark_medical_history_as_cured' history.id %}" class="d-inline">
+                                                            {% csrf_token %}
+                                                            <button type="submit" class="btn btn-sm btn-outline-success">
+                                                                <i class="fas fa-check"></i>
+                                                            </button>
+                                                        </form>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                        <tr>
+                                            <td colspan="4" class="text-center">{% trans "История болезней пуста" %}</td>
+                                        </tr>
+                                    {% endif %}
                                 </tbody>
                             </table>
                         </div>
@@ -219,18 +233,14 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr>
-                                                        <td>1</td>
-                                                        <td>0</td>
-                                                        <td>Cured</td>
-                                                        <td>{% trans "Статус для вылеченных болезней" %}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td>2</td>
-                                                        <td>1</td>
-                                                        <td>DuringTreatment</td>
-                                                        <td>{% trans "В процессе лечения" %}</td>
-                                                    </tr>
+                                                    {% for status in disease_statuses %}
+                                                        <tr>
+                                                            <td>{{ status.id }}</td>
+                                                            <td>{{ status.number }}</td>
+                                                            <td>{{ status.name }}</td>
+                                                            <td>{{ status.description }}</td>
+                                                        </tr>
+                                                    {% endfor %}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -250,30 +260,18 @@
                                                 <thead>
                                                     <tr>
                                                         <th>№</th>
-                                                        <th>{% trans "Тип данных" %}</th>
-                                                        <th>{% trans "Название поля" %}</th>
+                                                        <th>{% trans "Название" %}</th>
                                                         <th>{% trans "Описание" %}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr>
-                                                        <td>1</td>
-                                                        <td>int32</td>
-                                                        <td>ID</td>
-                                                        <td>{% trans "Уникальный идентификатор" %}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td>2</td>
-                                                        <td>string(50)</td>
-                                                        <td>Name</td>
-                                                        <td>{% trans "Название" %}</td>
-                                                    </tr>
-                                                    <tr>
-                                                        <td>3</td>
-                                                        <td>string(500)</td>
-                                                        <td>Desc</td>
-                                                        <td>{% trans "Описание" %}</td>
-                                                    </tr>
+                                                    {% for disease in diseases %}
+                                                        <tr>
+                                                            <td>{{ disease.id }}</td>
+                                                            <td>{{ disease.name }}</td>
+                                                            <td>{{ disease.description|truncatechars:50 }}</td>
+                                                        </tr>
+                                                    {% endfor %}
                                                 </tbody>
                                             </table>
                                         </div>
@@ -286,6 +284,7 @@
             </section>
         </div>
     </div>
+    {% endif %}
 </div>
 
 <!-- Structure Modals -->

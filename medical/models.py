@@ -11,91 +11,82 @@ class DiseaseStatus(models.IntegerChoices):
 # We'll extend functionality with related models
 
 class Doctor(models.Model):
-    """
-    Doctor model that extends CustomUser through a OneToOne relationship
-    """
+    """Model representing doctors (dcr_Doctor)"""
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='doctor_profile')
-    specialization = models.ForeignKey('Specialization', on_delete=models.CASCADE, related_name='doctors')
-    qualification = models.CharField(max_length=100)
-    experience_years = models.IntegerField()
-
-    def __str__(self):
-        return f"Dr. {self.user.first_name} {self.user.last_name} - {self.specialization.name}"
+    specialization = models.ForeignKey('Specialization', on_delete=models.CASCADE, related_name='doctors', verbose_name=_("Направление"))
+    qualification = models.CharField(_("Квалификация"), max_length=100)
+    experience_years = models.PositiveIntegerField(_("Стаж (в годах)"))
     
     class Meta:
-        verbose_name = _('Врач')
-        verbose_name_plural = _('Врачи')
+        verbose_name = _("Врач")
+        verbose_name_plural = _("Врачи")
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.specialization.name}"
 
 class Specialization(models.Model):
-    """
-    Medical specialization direction
-    """
-    name = models.CharField(max_length=50)
+    """Model representing medical specializations (dcr_Specialization)"""
+    name = models.CharField(_("Название"), max_length=50)
+    
+    class Meta:
+        verbose_name = _("Направление")
+        verbose_name_plural = _("Направления")
     
     def __str__(self):
         return self.name
-    
-    class Meta:
-        verbose_name = _('Направление')
-        verbose_name_plural = _('Направления')
 
 class Contact(models.Model):
-    """
-    Contact information for users
-    """
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='contacts')
-    code = models.CharField(max_length=50)  # Type of contact (email, phone, etc)
-    value = models.CharField(max_length=50)  # Actual contact value
-    
-    def __str__(self):
-        return f"{self.user.username} - {self.code}: {self.value}"
+    """Model representing contacts (dcr_Contacts)"""
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='contacts', verbose_name=_("Пользователь"))
+    code = models.CharField(_("Код контакта"), max_length=50)
+    value = models.CharField(_("Контакт"), max_length=50)
     
     class Meta:
-        verbose_name = _('Контакт')
-        verbose_name_plural = _('Контакты')
+        verbose_name = _("Контакт")
+        verbose_name_plural = _("Контакты")
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.code}: {self.value}"
 
 class Patient(models.Model):
-    """
-    Patient model that extends CustomUser through a OneToOne relationship
-    """
+    """Model representing patients (dcr_Patients)"""
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='patient_profile')
     
-    def __str__(self):
-        return f"Patient: {self.user.first_name} {self.user.last_name}"
-    
     class Meta:
-        verbose_name = _('Пациент')
-        verbose_name_plural = _('Пациенты')
+        verbose_name = _("Пациент")
+        verbose_name_plural = _("Пациенты")
+    
+    def __str__(self):
+        return self.user.get_full_name()
 
 class Disease(models.Model):
-    """
-    Disease catalog
-    """
-    name = models.CharField(max_length=50)
-    description = models.TextField(max_length=500, blank=True, null=True)
+    """Model representing diseases (dcr_Disease)"""
+    name = models.CharField(_("Название"), max_length=50)
+    description = models.TextField(_("Описание"), max_length=500, blank=True, null=True)
+    
+    class Meta:
+        verbose_name = _("Болезнь")
+        verbose_name_plural = _("Болезни")
     
     def __str__(self):
         return self.name
-    
-    class Meta:
-        verbose_name = _('Болезнь')
-        verbose_name_plural = _('Болезни')
 
 class MedicalHistory(models.Model):
-    """
-    Medical history record linking patients, diseases and doctors
-    """
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='medical_history')
-    disease = models.ForeignKey(Disease, on_delete=models.CASCADE, related_name='patient_cases')
-    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='patient_cases')
-    status = models.IntegerField(choices=DiseaseStatus.choices, default=DiseaseStatus.DURING_TREATMENT)
-    start_date = models.DateField(auto_now_add=True)
-    end_date = models.DateField(null=True, blank=True)
-    notes = models.TextField(blank=True, null=True)
+    """Model representing medical history (dcr_MedicalHistory)"""
+    class DiseaseStatus(models.IntegerChoices):
+        CURED = 0, _('Вылечен')
+        DURING_TREATMENT = 1, _('В процессе лечения')
+    
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='medical_histories', verbose_name=_("Пациент"))
+    disease = models.ForeignKey(Disease, on_delete=models.CASCADE, related_name='medical_histories', verbose_name=_("Болезнь"))
+    doctor = models.ForeignKey(Doctor, on_delete=models.CASCADE, related_name='medical_histories', verbose_name=_("Лечащий врач"))
+    status = models.IntegerField(_("Статус болезни"), choices=DiseaseStatus.choices, default=DiseaseStatus.DURING_TREATMENT)
+    created_at = models.DateTimeField(_("Дата создания"), auto_now_add=True, null=True)
+    updated_at = models.DateTimeField(_("Дата обновления"), auto_now=True, null=True)
+    
+    class Meta:
+        verbose_name = _("История болезни")
+        verbose_name_plural = _("Истории болезней")
     
     def __str__(self):
         return f"{self.patient} - {self.disease} ({self.get_status_display()})"
-    
-    class Meta:
-        verbose_name = _('История болезни')
-        verbose_name_plural = _('Истории болезней')

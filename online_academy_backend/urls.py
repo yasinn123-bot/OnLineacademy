@@ -35,6 +35,7 @@ urlpatterns += i18n_patterns(
     path('admin/', admin.site.urls),
     path('', include('core.urls')),
     path('api/medical/', include('medical.urls')),  # Medical API endpoints
+    path('medical/', include('medical.urls')),  # Medical views and templates
     path('certificate/', include('certificate.urls')),  # Certificate endpoints
     
     # JWT Auth endpoints

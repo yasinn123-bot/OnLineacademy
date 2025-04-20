@@ -1,16 +1,16 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import (DoctorViewSet, SpecializationViewSet, ContactViewSet,
-                   PatientViewSet, DiseaseViewSet, MedicalHistoryViewSet)
+from . import views
 
 router = DefaultRouter()
-router.register(r'doctors', DoctorViewSet)
-router.register(r'specializations', SpecializationViewSet)
-router.register(r'contacts', ContactViewSet)
-router.register(r'patients', PatientViewSet)
-router.register(r'diseases', DiseaseViewSet)
-router.register(r'medical-history', MedicalHistoryViewSet)
+router.register(r'doctors', views.DoctorViewSet)
+router.register(r'specializations', views.SpecializationViewSet)
+router.register(r'patients', views.PatientViewSet)
+router.register(r'medical-histories', views.MedicalHistoryViewSet)
+router.register(r'diseases', views.DiseaseViewSet)
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('api/', include(router.urls)),
+    path('dashboard/', views.doctor_dashboard, name='doctor_dashboard'),
+    path('mark-as-cured/<int:history_id>/', views.mark_medical_history_as_cured, name='mark_medical_history_as_cured'),
 ] 

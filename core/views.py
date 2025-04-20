@@ -428,46 +428,19 @@ def dashboard(request):
     user = request.user
     user_role = get_user_role(user)
     
+    # Redirect doctors to their specialized dashboard
+    if user_role == 'doctor':
+        return redirect('doctor_dashboard')
+    
     # Cache key specific to this user
     cache_key = f'dashboard_{user.id}'
     cached_context = cache.get(cache_key)
     
     if cached_context:
-        # For doctor role, render the doctor-specific template
-        if user_role == 'doctor':
-            return render(request, 'core/doctor_dashboard.html', cached_context)
         return render(request, 'core/dashboard.html', cached_context)
     
-    # Different dashboard content based on role
-    if user_role == 'doctor':
-        # For doctors: show their created courses and materials and the specialized dashboard
-        # Only fetch what's visible on the dashboard
-        courses_count = Course.objects.filter(author=user).count()
-        
-        if courses_count > 0:
-            # Only if there are courses, fetch the details with optimization
-            context = {
-                'created_courses': Course.objects.filter(author=user).select_related('author'),
-                'created_materials': Material.objects.filter(author=user).select_related('course'),
-                'courses_count': courses_count,
-                'user_role': user_role,
-            }
-        else:
-            # Don't waste resources fetching materials if no courses
-            context = {
-                'created_courses': [],
-                'courses_count': 0, 
-                'user_role': user_role,
-            }
-        
-        # Cache for 5 minutes
-        cache.set(cache_key, context, 60 * 5)
-        
-        # Return the doctor-specific dashboard
-        return render(request, 'core/doctor_dashboard.html', context)
-        
-    elif user_role == 'student' or user_role == 'parent':
-        # For students/parents: show their enrolled courses and progress
+    # For students/parents: show their enrolled courses and progress
+    if user_role == 'student' or user_role == 'parent':
         enrolled_courses = Course.objects.filter(user_progress__user=user).select_related('author')
         
         # If user is enrolled in courses, fetch progress details
