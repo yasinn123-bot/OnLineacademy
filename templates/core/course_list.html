@@ -2,89 +2,159 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}{% trans "Курсы" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+{% block title %}{% trans "Курсы" %} | {% trans "Онлайн-академия" %}{% endblock %}
 
 {% block content %}
 <div class="container">
+    <!-- Page Header -->
+    <header class="mb-5 pt-4">
+        <h1 class="section-heading text-dark">{% trans "Учебные курсы" %}</h1>
+        <p class="lead text-dark">{% trans "Выберите курс для начала обучения или повышения квалификации" %}</p>
+    </header>
+    
+    <!-- Filters -->
     <div class="row mb-4">
-        <div class="col-lg-8">
-            <h1 class="mb-3">{% trans "Доступные курсы" %}</h1>
-            <p class="lead">{% trans "Изучайте курсы по детской онкологии и онкогематологии от ведущих экспертов в области." %}</p>
-        </div>
-        
-        <div class="col-lg-4">
-            <div class="card shadow-sm">
-                <div class="card-header bg-white">
-                    <h5 class="card-title mb-0">{% trans "Фильтры" %}</h5>
+        <div class="col-md-8">
+            <form method="get" class="d-flex">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0">
+                        <i class="fas fa-search text-secondary"></i>
+                    </span>
+                    <input type="text" name="search" class="form-control border-start-0" placeholder="{% trans 'Поиск по названию или описанию' %}" value="{{ request.GET.search|default:'' }}">
+                    <button type="submit" class="btn btn-primary text-white">{% trans "Найти" %}</button>
                 </div>
-                <div class="card-body">
-                    <form method="get" action="{% url 'course-list' %}">
-                        <div class="mb-3">
-                            <label for="language" class="form-label">{% trans "Язык" %}</label>
-                            <select class="form-select" id="language" name="language">
-                                <option value="">{% trans "Все языки" %}</option>
-                                <option value="ru" {% if request.GET.language == 'ru' %}selected{% endif %}>{% trans "Русский" %}</option>
-                                <option value="en" {% if request.GET.language == 'en' %}selected{% endif %}>{% trans "Английский" %}</option>
-                                <option value="ky" {% if request.GET.language == 'ky' %}selected{% endif %}>{% trans "Кыргызский" %}</option>
-                            </select>
-                        </div>
-                        
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-filter me-2"></i>{% trans "Применить" %}
-                            </button>
-                        </div>
-                    </form>
+            </form>
+        </div>
+        <div class="col-md-4">
+            <div class="d-flex justify-content-md-end mt-3 mt-md-0">
+                <div class="dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-filter me-1"></i> {% trans "Фильтры" %}
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="filterDropdown">
+                        <li><a class="dropdown-item{% if not request.GET.level %} active{% endif %}" href="?{% if request.GET.search %}search={{ request.GET.search }}&{% endif %}">{% trans "Все уровни" %}</a></li>
+                        <li><a class="dropdown-item{% if request.GET.level == 'beginner' %} active{% endif %}" href="?{% if request.GET.search %}search={{ request.GET.search }}&{% endif %}level=beginner">{% trans "Начальный" %}</a></li>
+                        <li><a class="dropdown-item{% if request.GET.level == 'intermediate' %} active{% endif %}" href="?{% if request.GET.search %}search={{ request.GET.search }}&{% endif %}level=intermediate">{% trans "Средний" %}</a></li>
+                        <li><a class="dropdown-item{% if request.GET.level == 'advanced' %} active{% endif %}" href="?{% if request.GET.search %}search={{ request.GET.search }}&{% endif %}level=advanced">{% trans "Продвинутый" %}</a></li>
+                    </ul>
                 </div>
             </div>
         </div>
     </div>
     
+    <!-- Courses Grid -->
     <div class="row">
         {% if courses %}
             {% for course in courses %}
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card h-100 shadow-sm">
-                        {% if course.author.profile_picture %}
-                            <img src="{{ course.author.profile_picture.url }}" class="card-img-top" alt="{{ course.title }}">
+                    <div class="card h-100">
+                        {% if course.image %}
+                            <img src="{{ course.image.url }}" class="card-img-top" alt="{{ course.title }}">
                         {% else %}
                             <div class="bg-light text-center py-5">
-                                <i class="fas fa-book-medical fa-4x text-primary"></i>
+                                <i class="fas fa-book-medical fa-4x text-secondary"></i>
                             </div>
                         {% endif %}
-                        
-                        <div class="card-body">
-                            <h5 class="card-title">{{ course.title }}</h5>
-                            <p class="card-text text-muted small mb-2">
-                                <i class="fas fa-user me-1"></i> {{ course.author.get_full_name }}
-                                <span class="mx-2">|</span>
-                                <i class="fas fa-globe me-1"></i> {{ course.get_language_display }}
-                            </p>
-                            <p class="card-text">{{ course.description|truncatewords:20 }}</p>
-                        </div>
-                        
-                        <div class="card-footer bg-white border-top-0">
-                            <div class="d-grid">
-                                <a href="{% url 'course-detail' course.id %}" class="btn btn-outline-primary">
-                                    <i class="fas fa-info-circle me-2"></i>{% trans "Подробнее" %}
-                                </a>
+                        <div class="card-body d-flex flex-column">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <span class="badge bg-primary text-white">{{ course.get_level_display }}</span>
+                                <span class="text-muted"><i class="far fa-clock me-1"></i> {{ course.duration }}</span>
+                            </div>
+                            <h5 class="card-title text-dark">{{ course.title }}</h5>
+                            <p class="card-text text-dark flex-grow-1">{{ course.description|truncatechars:120 }}</p>
+                            <div class="mt-3">
+                                {% if course.instructor %}
+                                    <p class="small text-muted mb-3">
+                                        <i class="fas fa-user-md me-1"></i> {{ course.instructor.get_full_name }}
+                                    </p>
+                                {% endif %}
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <a href="{% url 'course-detail' course.id %}" class="btn btn-primary text-white">{% trans "Открыть курс" %}</a>
+                                    {% if user.is_authenticated %}
+                                        {% if course.id in enrolled_courses %}
+                                            <span class="badge bg-success text-white"><i class="fas fa-check me-1"></i> {% trans "Записан" %}</span>
+                                        {% else %}
+                                            <form method="post" action="{% url 'course-enroll' course.id %}">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-outline-primary btn-sm">
+                                                    <i class="fas fa-plus me-1"></i> {% trans "Записаться" %}
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             {% endfor %}
         {% else %}
-            <div class="col-12">
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle me-2"></i>
-                    {% if request.GET.language %}
-                        {% trans "Курсы на выбранном языке не найдены. Попробуйте выбрать другой язык или сбросить фильтры." %}
-                    {% else %}
-                        {% trans "В настоящее время нет доступных курсов. Пожалуйста, проверьте позже." %}
-                    {% endif %}
+            <div class="col-12 py-5 text-center">
+                <div class="py-5 bg-light rounded-3">
+                    <i class="fas fa-search fa-3x text-secondary mb-3"></i>
+                    <h4 class="mb-3 text-dark">{% trans "Курсы не найдены" %}</h4>
+                    <p class="mb-4 text-dark">{% trans "По вашему запросу не найдено ни одного курса. Попробуйте изменить параметры поиска." %}</p>
+                    <a href="{% url 'course-list' %}" class="btn btn-primary text-white">{% trans "Все курсы" %}</a>
                 </div>
             </div>
         {% endif %}
     </div>
+    
+    <!-- Pagination -->
+    {% if courses.has_other_pages %}
+    <nav aria-label="Page navigation" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if courses.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.level %}&level={{ request.GET.level }}{% endif %}" aria-label="First">
+                        <span aria-hidden="true">&laquo;&laquo;</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ courses.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.level %}&level={{ request.GET.level }}{% endif %}" aria-label="Previous">
+                        <span aria-hidden="true">&laquo;</span>
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <a class="page-link" href="#" tabindex="-1" aria-disabled="true"><span aria-hidden="true">&laquo;&laquo;</span></a>
+                </li>
+                <li class="page-item disabled">
+                    <a class="page-link" href="#" tabindex="-1" aria-disabled="true"><span aria-hidden="true">&laquo;</span></a>
+                </li>
+            {% endif %}
+            
+            {% for num in courses.paginator.page_range %}
+                {% if courses.number == num %}
+                    <li class="page-item active"><a class="page-link" href="#">{{ num }}</a></li>
+                {% elif num > courses.number|add:'-3' and num < courses.number|add:'3' %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.level %}&level={{ request.GET.level }}{% endif %}">{{ num }}</a>
+                    </li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if courses.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ courses.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.level %}&level={{ request.GET.level }}{% endif %}" aria-label="Next">
+                        <span aria-hidden="true">&raquo;</span>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ courses.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.level %}&level={{ request.GET.level }}{% endif %}" aria-label="Last">
+                        <span aria-hidden="true">&raquo;&raquo;</span>
+                    </a>
+                </li>
+            {% else %}
+                <li class="page-item disabled">
+                    <a class="page-link" href="#" tabindex="-1" aria-disabled="true"><span aria-hidden="true">&raquo;</span></a>
+                </li>
+                <li class="page-item disabled">
+                    <a class="page-link" href="#" tabindex="-1" aria-disabled="true"><span aria-hidden="true">&raquo;&raquo;</span></a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
 </div>
 {% endblock %} 

@@ -156,23 +156,23 @@
                                 </div>
                             {% endif %}
                             
-                            <div class="form-text file-type-info" id="video-info" style="display: none;">
-                                <i class="fas fa-info-circle me-1"></i> {% trans "Рекомендуемые форматы видео: MP4, WebM. Максимальный размер: 200MB." %}
-                            </div>
-                            <div class="form-text file-type-info" id="presentation-info" style="display: none;">
-                                <i class="fas fa-info-circle me-1"></i> {% trans "Рекомендуемые форматы презентаций: PDF, PPTX. Максимальный размер: 100MB." %}
-                            </div>
-                            <div class="form-text file-type-info" id="document-info" style="display: none;">
-                                <i class="fas fa-info-circle me-1"></i> {% trans "Рекомендуемые форматы документов: PDF, DOCX. Максимальный размер: 50MB." %}
-                            </div>
-                            <div class="form-text file-type-info" id="protocol-info" style="display: none;">
-                                <i class="fas fa-info-circle me-1"></i> {% trans "Рекомендуемые форматы протоколов: PDF, DOCX. Максимальный размер: 50MB." %}
-                            </div>
-                            <div class="form-text file-type-info" id="research-info" style="display: none;">
-                                <i class="fas fa-info-circle me-1"></i> {% trans "Рекомендуемые форматы исследований: PDF, DOCX. Максимальный размер: 50MB." %}
-                            </div>
-                            <div class="form-text file-type-info" id="recommendation-info" style="display: none;">
-                                <i class="fas fa-info-circle me-1"></i> {% trans "Рекомендуемые форматы рекомендаций: PDF, DOCX. Максимальный размер: 50MB." %}
+                            <div class="alert alert-info mt-3">
+                                <div class="d-flex">
+                                    <div class="me-3">
+                                        <i class="fas fa-info-circle fa-2x"></i>
+                                    </div>
+                                    <div>
+                                        <h5 class="alert-heading">{% trans "Рекомендации для файлов" %}</h5>
+                                        <p class="mb-1">{% trans "Рекомендуемые форматы файлов:" %}</p>
+                                        <ul class="mb-0">
+                                            <li>{% trans "PDF - для документов с фиксированным форматированием" %}</li>
+                                            <li>{% trans "DOCX, DOC - для документов, которые могут редактироваться" %}</li>
+                                            <li>{% trans "MP4, WebM - для видео материалов" %}</li>
+                                            <li>{% trans "PPTX, PPT - для презентаций" %}</li>
+                                        </ul>
+                                        <p class="mt-2 mb-0">{% trans "Размер файла не должен превышать 50MB." %}</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -201,35 +201,29 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
-                            <h6><i class="fas fa-video text-danger me-2"></i>{% trans "Видео" %}</h6>
-                            <ul class="small">
-                                <li>{% trans "Оптимальная длина видео 5-15 минут" %}</li>
-                                <li>{% trans "Используйте хорошее освещение и четкий звук" %}</li>
-                                <li>{% trans "Структурируйте содержание с заголовками" %}</li>
-                            </ul>
-                            
-                            <h6 class="mt-3"><i class="fas fa-file-powerpoint text-warning me-2"></i>{% trans "Презентации" %}</h6>
-                            <ul class="small">
-                                <li>{% trans "Используйте крупный шрифт (не менее 24pt)" %}</li>
-                                <li>{% trans "Не перегружайте слайды текстом" %}</li>
-                                <li>{% trans "Добавляйте информативные диаграммы и изображения" %}</li>
-                            </ul>
-                        </div>
-                        <div class="col-md-6">
                             <h6><i class="fas fa-file-alt text-primary me-2"></i>{% trans "Документы" %}</h6>
                             <ul class="small">
                                 <li>{% trans "Включайте оглавление для длинных документов" %}</li>
-                                <li>{% trans "Используйте заголовки и подзаголовки" %}</li>
+                                <li>{% trans "Используйте заголовки и подзаголовки для структурирования" %}</li>
                                 <li>{% trans "Добавляйте списки для удобства чтения" %}</li>
-                            </ul>
-                            
-                            <h6 class="mt-3"><i class="fas fa-clipboard-list text-success me-2"></i>{% trans "Протоколы и исследования" %}</h6>
-                            <ul class="small">
-                                <li>{% trans "Четко указывайте методологию и источники" %}</li>
-                                <li>{% trans "Структурируйте по разделам исследования" %}</li>
-                                <li>{% trans "Выделяйте важные выводы и рекомендации" %}</li>
+                                <li>{% trans "Выделяйте важные термины и определения" %}</li>
+                                <li>{% trans "Включайте краткое резюме или выводы в конце" %}</li>
                             </ul>
                         </div>
+                        <div class="col-md-6">
+                            <h6><i class="fas fa-clipboard-list text-success me-2"></i>{% trans "Протоколы и исследования" %}</h6>
+                            <ul class="small">
+                                <li>{% trans "Четко указывайте методологию и источники" %}</li>
+                                <li>{% trans "Структурируйте материал по логическим разделам" %}</li>
+                                <li>{% trans "Выделяйте важные выводы и рекомендации" %}</li>
+                                <li>{% trans "Добавляйте ссылки на источники и дополнительную литературу" %}</li>
+                                <li>{% trans "Используйте таблицы для систематизации данных" %}</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="alert alert-success mt-3">
+                        <i class="fas fa-lightbulb me-2"></i>
+                        {% trans "Для лучшего усвоения информации создавайте краткие и структурированные документы, фокусируясь на главных аспектах темы. Используйте профессиональную терминологию с пояснениями, где это необходимо." %}
                     </div>
                 </div>
             </div>
@@ -251,39 +245,18 @@
             }
         });
         
-        // File input styling
-        const fileInput = document.querySelector('#materialForm input[type=file]');
-        if (fileInput) {
-            fileInput.classList.add('form-control');
-        }
-        
-        // Update file info based on material type
-        const materialTypeSelect = document.getElementById('{{ form.material_type.id_for_label }}');
-        const fileTypeInfos = document.querySelectorAll('.file-type-info');
-        
-        function updateFileInfo() {
-            fileTypeInfos.forEach(info => info.style.display = 'none');
-            
-            const selectedType = materialTypeSelect.value;
-            const infoElement = document.getElementById(selectedType + '-info');
-            
-            if (infoElement) {
-                infoElement.style.display = 'block';
-            }
-        }
-        
-        materialTypeSelect.addEventListener('change', updateFileInfo);
-        updateFileInfo(); // Run on page load
-        
-        // Set course from URL parameter if present
-        const urlParams = new URLSearchParams(window.location.search);
-        const courseParam = urlParams.get('course');
-        
-        if (courseParam) {
-            const courseSelect = document.querySelector('#id_course');
-            if (courseSelect) {
-                courseSelect.value = courseParam;
-            }
+        // File size validation
+        const fileInput = document.getElementById('{{ form.file.id_for_label }}');
+        if(fileInput) {
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    const file = this.files[0];
+                    if (file.size > 50 * 1024 * 1024) { // 50MB
+                        alert('{% trans "Размер файла не должен превышать 50MB." %}');
+                        this.value = '';
+                    }
+                }
+            });
         }
     });
 </script>

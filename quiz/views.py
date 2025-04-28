@@ -21,6 +21,7 @@ from .serializers import (
     QuizAttemptListSerializer, QuizAttemptDetailSerializer, AnswerSerializer
 )
 from core.models import Course, CustomUser
+from .forms import QuizForm, QuestionForm
 
 # API Viewsets
 class QuizViewSet(viewsets.ModelViewSet):
@@ -522,50 +523,22 @@ def create_quiz(request):
     # Only staff and doctors can create quizzes
     if not request.user.is_staff and request.user.role != 'doctor':
         messages.error(request, _("У вас нет прав для создания тестов"))
-        return redirect('quiz_list')
-    
-    # Get courses for dropdown
-    if request.user.is_staff:
-        courses = Course.objects.all()
-    else:
-        courses = Course.objects.filter(Q(is_published=True) | Q(author=request.user))
+        return redirect('quiz:quiz_list')
     
     if request.method == 'POST':
-        # Process form data
-        title = request.POST.get('title')
-        description = request.POST.get('description')
-        course_id = request.POST.get('course')
-        time_limit = request.POST.get('time_limit') or 30
-        passing_score = request.POST.get('passing_score') or 70
-        is_published = request.POST.get('is_published') == 'on'
-        
-        if not title:
-            messages.error(request, _("Название теста обязательно"))
-            return render(request, 'quiz/create_quiz.html', {
-                'courses': courses,
-                'user_role': request.user.role,
-            })
-        
-        # Create quiz
-        course = None
-        if course_id:
-            course = get_object_or_404(Course, pk=course_id)
-        
-        quiz = Quiz.objects.create(
-            title=title,
-            description=description,
-            course=course,
-            author=request.user,
-            time_limit=time_limit,
-            passing_score=passing_score,
-            is_published=is_published
-        )
-        
-        messages.success(request, _("Тест успешно создан. Теперь добавьте вопросы."))
-        return redirect('edit_quiz', pk=quiz.id)
+        form = QuizForm(request.POST, user=request.user)
+        if form.is_valid():
+            quiz = form.save(commit=False)
+            quiz.author = request.user
+            quiz.save()
+            
+            messages.success(request, _("Тест успешно создан. Теперь добавьте вопросы."))
+            return redirect('quiz:edit_quiz', pk=quiz.id)
+    else:
+        form = QuizForm(user=request.user)
     
     context = {
-        'courses': courses,
+        'form': form,
         'user_role': request.user.role,
     }
     
@@ -639,55 +612,29 @@ def create_question(request, quiz_id):
     # Check permissions
     if not request.user.is_staff and quiz.author != request.user:
         messages.error(request, _("У вас нет прав для редактирования этого теста"))
-        return redirect('quiz_list')
+        return redirect('quiz:quiz_list')
     
     if request.method == 'POST':
-        # Process form data
-        text = request.POST.get('text')
-        question_type = request.POST.get('question_type')
-        points = request.POST.get('points') or 1
-        explanation = request.POST.get('explanation')
-        order = request.POST.get('order') or 0
-        
-        if not text:
-            messages.error(request, _("Текст вопроса обязателен"))
-            return render(request, 'quiz/create_question.html', {
-                'quiz': quiz,
-                'user_role': request.user.role,
-            })
-        
-        # Create question
-        question = Question.objects.create(
-            quiz=quiz,
-            text=text,
-            question_type=question_type,
-            points=points,
-            explanation=explanation,
-            order=order
-        )
-        
-        # Process choices
-        choice_texts = request.POST.getlist('choice_text[]')
-        is_correct_values = request.POST.getlist('is_correct[]')
-        
-        for i, choice_text in enumerate(choice_texts):
-            if choice_text.strip():
-                is_correct = str(i) in is_correct_values
-                Choice.objects.create(
-                    question=question,
-                    text=choice_text,
-                    is_correct=is_correct
-                )
-        
-        messages.success(request, _("Вопрос успешно создан"))
-        return redirect('edit_quiz', pk=quiz.id)
+        form = QuestionForm(request.POST)
+        if form.is_valid():
+            question = form.save(quiz=quiz)
+            
+            if 'save_and_add' in request.POST:
+                messages.success(request, _("Вопрос успешно создан. Добавьте еще один вопрос."))
+                return redirect('quiz:create_question', quiz_id=quiz.id)
+            else:
+                messages.success(request, _("Вопрос успешно создан"))
+                return redirect('quiz:edit_quiz', pk=quiz.id)
+    else:
+        form = QuestionForm()
     
     context = {
+        'form': form,
         'quiz': quiz,
         'user_role': request.user.role,
     }
     
-    return render(request, 'quiz/create_question.html', context)
+    return render(request, 'quiz/add_question.html', context)
 
 @login_required
 def edit_question(request, question_id):

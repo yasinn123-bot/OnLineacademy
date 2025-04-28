@@ -192,22 +192,6 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Apply Bootstrap classes to form elements
-        const formElements = document.querySelectorAll('#createQuizForm input[type=text], #createQuizForm input[type=number], #createQuizForm textarea, #createQuizForm select');
-        formElements.forEach(function(element) {
-            element.classList.add('form-control');
-            
-            if (element.hasAttribute('required')) {
-                element.classList.add('border-primary');
-            }
-        });
-        
-        // Apply Bootstrap form-check-input class to checkboxes
-        const checkboxes = document.querySelectorAll('#createQuizForm input[type=checkbox]');
-        checkboxes.forEach(function(checkbox) {
-            checkbox.classList.add('form-check-input');
-        });
-        
         // Show course field only if course is selected in URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const courseParam = urlParams.get('course');

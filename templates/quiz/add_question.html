@@ -58,24 +58,45 @@
                         {% endif %}
                         
                         <div class="mb-3">
-                            <label for="question_text" class="form-label">{% trans "Текст вопроса" %}*</label>
-                            <textarea class="form-control" id="question_text" name="question_text" rows="3" required></textarea>
+                            <label for="{{ form.text.id_for_label }}" class="form-label">{% trans "Текст вопроса" %}*</label>
+                            {{ form.text }}
+                            {% if form.text.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.text.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
                         </div>
                         
                         <div class="mb-3">
-                            <label for="question_type" class="form-label">{% trans "Тип вопроса" %}*</label>
-                            <select class="form-select" id="question_type" name="question_type" required>
-                                <option value="single">{% trans "Один правильный вариант" %}</option>
-                                <option value="multiple">{% trans "Несколько правильных вариантов" %}</option>
-                                <option value="short_answer">{% trans "Короткий ответ (текст)" %}</option>
-                            </select>
+                            <label for="{{ form.question_type.id_for_label }}" class="form-label">{% trans "Тип вопроса" %}*</label>
+                            {{ form.question_type }}
+                            {% if form.question_type.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.question_type.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
                         </div>
                         
                         <div class="mb-3">
-                            <label for="points" class="form-label">{% trans "Количество баллов" %}*</label>
-                            <input type="number" class="form-control" id="points" name="points" value="1" min="1" max="100" required>
+                            <label for="{{ form.points.id_for_label }}" class="form-label">{% trans "Количество баллов" %}*</label>
+                            {{ form.points }}
+                            {% if form.points.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.points.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
                             <small class="form-text text-muted">{% trans "Сколько баллов получит студент за правильный ответ на этот вопрос." %}</small>
                         </div>
+                        
+                        <!-- Hidden fields for choices handling -->
+                        {{ form.choice_texts }}
+                        {{ form.correct_choices }}
                         
                         <!-- Choices for single/multiple choice questions -->
                         <div id="choices-section">
@@ -85,9 +106,9 @@
                                 <div class="choice-row">
                                     <div class="input-group">
                                         <div class="input-group-text">
-                                            <input type="checkbox" class="form-check-input correct-choice" name="correct_choices[]" value="0">
+                                            <input type="checkbox" class="form-check-input correct-choice" value="0">
                                         </div>
-                                        <input type="text" class="form-control" name="choices[]" placeholder="{% trans 'Вариант ответа' %}" required>
+                                        <input type="text" class="form-control choice-text" placeholder="{% trans 'Вариант ответа' %}">
                                         <button type="button" class="btn btn-outline-danger remove-choice">
                                             <i class="fas fa-times"></i>
                                         </button>
@@ -96,9 +117,9 @@
                                 <div class="choice-row">
                                     <div class="input-group">
                                         <div class="input-group-text">
-                                            <input type="checkbox" class="form-check-input correct-choice" name="correct_choices[]" value="1">
+                                            <input type="checkbox" class="form-check-input correct-choice" value="1">
                                         </div>
-                                        <input type="text" class="form-control" name="choices[]" placeholder="{% trans 'Вариант ответа' %}" required>
+                                        <input type="text" class="form-control choice-text" placeholder="{% trans 'Вариант ответа' %}">
                                         <button type="button" class="btn btn-outline-danger remove-choice">
                                             <i class="fas fa-times"></i>
                                         </button>
@@ -118,18 +139,20 @@
                         <!-- Short answer field -->
                         <div id="short-answer-section" class="mb-3 short-answer-field">
                             <label for="answer_text" class="form-label">{% trans "Правильный ответ" %}*</label>
-                            <input type="text" class="form-control" id="answer_text" name="answer_text">
+                            <input type="text" class="form-control" id="answer_text">
                             <small class="form-text text-muted">{% trans "Введите правильный ответ для вопроса. Регистр букв не будет учитываться при проверке." %}</small>
                         </div>
                         
-                        <div class="mb-3 form-check">
-                            <input type="checkbox" class="form-check-input" id="explanation_checkbox">
-                            <label class="form-check-label" for="explanation_checkbox">{% trans "Добавить объяснение ответа" %}</label>
-                        </div>
-                        
-                        <div class="mb-4" id="explanation-section" style="display: none;">
-                            <label for="explanation" class="form-label">{% trans "Объяснение" %}</label>
-                            <textarea class="form-control" id="explanation" name="explanation" rows="3"></textarea>
+                        <div class="mb-3">
+                            <label for="{{ form.explanation.id_for_label }}" class="form-label">{% trans "Объяснение" %}</label>
+                            {{ form.explanation }}
+                            {% if form.explanation.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.explanation.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
                             <small class="form-text text-muted">{% trans "Это объяснение будет показано студенту после ответа на вопрос." %}</small>
                         </div>
                         
@@ -157,19 +180,18 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const questionTypeSelect = document.getElementById('question_type');
+        const questionTypeSelect = document.getElementById('{{ form.question_type.id_for_label }}');
         const choicesSection = document.getElementById('choices-section');
         const shortAnswerSection = document.getElementById('short-answer-section');
         const choiceHelpText = document.getElementById('choice-help-text');
         const addChoiceBtn = document.getElementById('add-choice');
         const choicesContainer = document.getElementById('choices-container');
-        const explanationCheckbox = document.getElementById('explanation_checkbox');
-        const explanationSection = document.getElementById('explanation-section');
+        const choiceTextsField = document.getElementById('{{ form.choice_texts.id_for_label }}');
+        const correctChoicesField = document.getElementById('{{ form.correct_choices.id_for_label }}');
         
-        // Toggle explanation section
-        explanationCheckbox.addEventListener('change', function() {
-            explanationSection.style.display = this.checked ? 'block' : 'none';
-        });
+        // Hide the textarea for choice texts (will be filled programmatically)
+        choiceTextsField.style.display = 'none';
+        correctChoicesField.style.display = 'none';
         
         // Handle question type changes
         questionTypeSelect.addEventListener('change', function() {
@@ -191,7 +213,7 @@
                 } else {
                     checkboxes.forEach(cb => {
                         cb.type = 'checkbox';
-                        cb.name = 'correct_choices[]';
+                        cb.name = 'correct_choices';
                     });
                     choiceHelpText.textContent = '{% trans "Отметьте все правильные варианты ответов." %}';
                 }
@@ -205,14 +227,14 @@
             newRow.className = 'choice-row';
             
             const inputType = questionTypeSelect.value === 'single' ? 'radio' : 'checkbox';
-            const inputName = questionTypeSelect.value === 'single' ? 'correct_choice' : 'correct_choices[]';
+            const inputName = questionTypeSelect.value === 'single' ? 'correct_choice' : 'correct_choices';
             
             newRow.innerHTML = `
                 <div class="input-group">
                     <div class="input-group-text">
                         <input type="${inputType}" class="form-check-input correct-choice" name="${inputName}" value="${choiceCounter}">
                     </div>
-                    <input type="text" class="form-control" name="choices[]" placeholder="{% trans 'Вариант ответа' %}" required>
+                    <input type="text" class="form-control choice-text" placeholder="{% trans 'Вариант ответа' %}">
                     <button type="button" class="btn btn-outline-danger remove-choice">
                         <i class="fas fa-times"></i>
                     </button>
@@ -221,15 +243,6 @@
             
             choicesContainer.appendChild(newRow);
             choiceCounter++;
-            
-            // Add event listener to new remove button
-            newRow.querySelector('.remove-choice').addEventListener('click', function() {
-                if (choicesContainer.children.length > 2) {
-                    this.closest('.choice-row').remove();
-                } else {
-                    alert('{% trans "Должно быть как минимум два варианта ответа" %}');
-                }
-            });
         });
         
         // Remove choice event delegation
@@ -243,25 +256,49 @@
             }
         });
         
-        // Form validation before submit
+        // Before form submission, collect choices
         document.getElementById('question-form').addEventListener('submit', function(e) {
             if (questionTypeSelect.value !== 'short_answer') {
-                // For choice questions, check if at least one correct answer is selected
-                const selectedCorrect = document.querySelectorAll('.correct-choice:checked');
-                if (selectedCorrect.length === 0) {
+                // For choice questions, collect all choice texts and correct choices
+                const choiceRows = document.querySelectorAll('.choice-row');
+                let choiceTexts = [];
+                let correctChoices = [];
+                
+                choiceRows.forEach((row, index) => {
+                    const choiceText = row.querySelector('.choice-text').value.trim();
+                    const isCorrect = row.querySelector('.correct-choice').checked;
+                    
+                    if (choiceText) {
+                        choiceTexts.push(choiceText);
+                        if (isCorrect) {
+                            correctChoices.push(index);
+                        }
+                    }
+                });
+                
+                // Validate at least one correct answer is selected
+                if (correctChoices.length === 0) {
                     e.preventDefault();
-                    alert('{% trans "Выберите хотя бы один правильный ответ" %}');
-                    return false;
+                    alert('{% trans "Пожалуйста, отметьте хотя бы один правильный ответ" %}');
+                    return;
                 }
+                
+                // Fill the hidden fields with the collected data
+                choiceTextsField.value = choiceTexts.join('\n');
+                correctChoicesField.value = correctChoices.join(',');
             } else {
-                // For short answer, check if answer is provided
-                if (document.getElementById('answer_text').value.trim() === '') {
+                // For short answer questions
+                const answerText = document.getElementById('answer_text').value.trim();
+                if (!answerText) {
                     e.preventDefault();
-                    alert('{% trans "Введите правильный ответ для вопроса с коротким ответом" %}');
-                    return false;
+                    alert('{% trans "Пожалуйста, введите правильный ответ для вопроса" %}');
+                    return;
                 }
+                
+                // For short answer, we use a single choice text with is_correct=true
+                choiceTextsField.value = answerText;
+                correctChoicesField.value = '0';
             }
-            return true;
         });
     });
 </script>

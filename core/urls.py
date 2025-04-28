@@ -21,6 +21,10 @@ urlpatterns = [
     path('api/comments/<int:pk>/', views.CommentDetailView.as_view(), name='comment-detail'),
     path('api/courses/<int:course_id>/progress/', views.UserProgressView.as_view(), name='user-progress'),
     
+    # Comment URLs
+    path('comments/create/', views.comment_create, name='comment-create'),
+    path('comments/<int:pk>/delete/', views.comment_delete, name='comment-delete'),
+    
     # Template views
     path('', views.home, name='home'),
     path('login/', views.login_view, name='login'),

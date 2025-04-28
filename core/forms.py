@@ -31,4 +31,13 @@ class MaterialForm(forms.ModelForm):
         super(MaterialForm, self).__init__(*args, **kwargs)
         if user:
             # Only show courses created by this user
-            self.fields['course'].queryset = Course.objects.filter(author=user) 
+            self.fields['course'].queryset = Course.objects.filter(author=user)
+            
+            # For doctors, restrict material types to only text-based options
+            if user.role == 'doctor':
+                self.fields['material_type'].choices = [
+                    (MaterialType.DOCUMENT, _('Документ')),
+                    (MaterialType.PROTOCOL, _('Протокол')),
+                    (MaterialType.RESEARCH, _('Исследование')),
+                    (MaterialType.RECOMMENDATION, _('Рекомендация'))
+                ] 

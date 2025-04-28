@@ -64,6 +64,9 @@ class Material(models.Model):
         ('ky', _('Кыргызский'))
     ), default='ru')
     
+    class Meta:
+        ordering = ['-created_at']
+    
     def __str__(self):
         return self.name
 

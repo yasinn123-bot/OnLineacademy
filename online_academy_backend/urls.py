@@ -37,6 +37,7 @@ urlpatterns += i18n_patterns(
     path('api/medical/', include('medical.urls')),  # Medical API endpoints
     path('medical/', include('medical.urls')),  # Medical views and templates
     path('certificate/', include('certificate.urls')),  # Certificate endpoints
+    path('quiz/', include('quiz.urls')),  # Quiz app URLs
     
     # JWT Auth endpoints
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

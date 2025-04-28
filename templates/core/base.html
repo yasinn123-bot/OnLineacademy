@@ -11,6 +11,10 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     {% block extra_css %}{% endblock %}
@@ -18,140 +22,114 @@
 <body>
     <!-- Navigation -->
     {% get_current_language as CURRENT_LANGUAGE %}
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="{% url 'home' %}">
-                {% trans "Онлайн-академия" %}
-            </a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{% url 'home' %}">
-                            {% trans "Главная" %}
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link {% if 'courses' in request.path %}active{% endif %}" href="{% url 'course-list' %}">
-                            {% trans "Курсы" %}
-                        </a>
-                    </li>
-                    {% if user.is_authenticated %}
-                        <li class="nav-item">
-                            <a class="nav-link {% if 'dashboard' in request.path %}active{% endif %}" href="{% url 'dashboard' %}">
-                                {% trans "Личный кабинет" %}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if 'material-list' in request.path %}active{% endif %}" href="{% url 'material-list' %}">
-                                {% trans "Учебные материалы" %}
-                            </a>
-                        </li>
-                        {% if user_role == 'doctor' %}
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="materialsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    {% trans "Управление контентом" %}
-                                </a>
-                                <ul class="dropdown-menu" aria-labelledby="materialsDropdown">
-                                    <li><a class="dropdown-item" href="{% url 'material-create' %}">{% trans "Добавить материал" %}</a></li>
-                                    <li><a class="dropdown-item" href="{% url 'quiz:create_quiz' %}">{% trans "Создать тест" %}</a></li>
+    <header>
+        <!-- Top Bar with brand and authentication -->
+        <div class="topbar py-2">
+            <div class="container d-flex justify-content-between align-items-center">
+                <a class="logo" href="{% url 'home' %}">
+                    <span class="logo-text">{% trans "Онлайн-академия" %}</span>
+                </a>
+                
+                <div class="d-flex align-items-center">
+                    <!-- User Authentication -->
+                    <div class="d-flex">
+                        {% if user.is_authenticated %}
+                            <div class="dropdown">
+                                <button class="btn btn-light dropdown-toggle no-animation text-dark" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <i class="fas fa-user-circle me-1"></i> {{ user.get_full_name|default:user.username }}
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                    <li><a class="dropdown-item text-dark" href="{% url 'user-profile' %}">{% trans "Профиль" %}</a></li>
+                                    {% if user.is_staff %}
+                                        <li><a class="dropdown-item text-dark" href="{% url 'admin:index' %}">{% trans "Админ-панель" %}</a></li>
+                                    {% endif %}
                                     <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item" href="{% url 'quiz:quiz_list' %}">{% trans "Все тесты" %}</a></li>
+                                    <li>
+                                        <form method="post" action="{% url 'logout' %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="dropdown-item text-dark">{% trans "Выйти" %}</button>
+                                        </form>
+                                    </li>
                                 </ul>
-                            </li>
+                            </div>
+                        {% else %}
+                            <a href="{% url 'login' %}" class="btn btn-light me-2 no-animation text-dark">{% trans "Войти" %}</a>
+                            <a href="{% url 'register' %}" class="btn btn-primary no-animation text-white">{% trans "Регистрация" %}</a>
                         {% endif %}
-                        {% if user_role == 'student' or user_role == 'parent' %}
-                            <li class="nav-item">
-                                <a class="nav-link {% if 'certificates' in request.path %}active{% endif %}" href="{% url 'certificate-list' %}">
-                                    {% trans "Сертификаты" %}
-                                </a>
-                            </li>
-                        {% endif %}
-                    {% endif %}
-                </ul>
-                
-                <!-- Language Selector -->
-                <div class="dropdown me-3">
-                    <button class="btn btn-sm btn-outline-light dropdown-toggle" type="button" id="languageDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                        {% if CURRENT_LANGUAGE == 'ru' %}
-                            <i class="fas fa-globe"></i> RU
-                        {% elif CURRENT_LANGUAGE == 'en' %}
-                            <i class="fas fa-globe"></i> EN
-                        {% elif CURRENT_LANGUAGE == 'ky' %}
-                            <i class="fas fa-globe"></i> KY
-                        {% endif %}
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="languageDropdown">
-                        <li>
-                            <form action="{% url 'set_language' %}" method="post" class="d-inline language-switch-form">
-                                {% csrf_token %}
-                                <input name="next" type="hidden" value="{{ request.path }}">
-                                <input name="language" type="hidden" value="ru">
-                                <button type="submit" class="dropdown-item">Русский</button>
-                            </form>
-                        </li>
-                        <li>
-                            <form action="{% url 'set_language' %}" method="post" class="d-inline language-switch-form">
-                                {% csrf_token %}
-                                <input name="next" type="hidden" value="{{ request.path }}">
-                                <input name="language" type="hidden" value="en">
-                                <button type="submit" class="dropdown-item">English</button>
-                            </form>
-                        </li>
-                        <li>
-                            <form action="{% url 'set_language' %}" method="post" class="d-inline language-switch-form">
-                                {% csrf_token %}
-                                <input name="next" type="hidden" value="{{ request.path }}">
-                                <input name="language" type="hidden" value="ky">
-                                <button type="submit" class="dropdown-item">Кыргызча</button>
-                            </form>
-                        </li>
-                    </ul>
-                </div>
-                
-                <!-- User Authentication -->
-                <div class="d-flex">
-                    {% if user.is_authenticated %}
-                        <div class="dropdown">
-                            <button class="btn btn-outline-light dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="fas fa-user-circle me-1"></i> {{ user.get_full_name|default:user.username }}
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
-                                <li><a class="dropdown-item" href="{% url 'user-profile' %}">{% trans "Профиль" %}</a></li>
-                                {% if user.is_staff %}
-                                    <li><a class="dropdown-item" href="{% url 'admin:index' %}">{% trans "Админ-панель" %}</a></li>
-                                {% endif %}
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <form method="post" action="{% url 'logout' %}">
-                                        {% csrf_token %}
-                                        <button type="submit" class="dropdown-item">{% trans "Выйти" %}</button>
-                                    </form>
-                                </li>
-                            </ul>
-                        </div>
-                    {% else %}
-                        <a href="{% url 'login' %}" class="btn btn-outline-light me-2">{% trans "Войти" %}</a>
-                        <a href="{% url 'register' %}" class="btn btn-light">{% trans "Регистрация" %}</a>
-                    {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
-    </nav>
+        
+        <!-- Main Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-light main-nav py-0">
+            <div class="container">
+                <button class="navbar-toggler my-2" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav main-menu">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{% url 'home' %}">
+                                {% trans "Главная" %}
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'courses' in request.path %}active{% endif %}" href="{% url 'course-list' %}">
+                                {% trans "Курсы" %}
+                            </a>
+                        </li>
+                        {% if user.is_authenticated %}
+                            <li class="nav-item">
+                                <a class="nav-link {% if 'dashboard' in request.path %}active{% endif %}" href="{% url 'dashboard' %}">
+                                    {% trans "Личный кабинет" %}
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if 'material-list' in request.path %}active{% endif %}" href="{% url 'material-list' %}">
+                                    {% trans "Учебные материалы" %}
+                                </a>
+                            </li>
+                            {% if user_role == 'doctor' %}
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle" href="#" id="materialsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        {% trans "Управление контентом" %}
+                                    </a>
+                                    <ul class="dropdown-menu" aria-labelledby="materialsDropdown">
+                                        <li><a class="dropdown-item text-dark" href="{% url 'material-create' %}">{% trans "Добавить материал" %}</a></li>
+                                        <li><a class="dropdown-item text-dark" href="{% url 'quiz:create_quiz' %}">{% trans "Создать тест" %}</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item text-dark" href="{% url 'quiz:quiz_list' %}">{% trans "Все тесты" %}</a></li>
+                                    </ul>
+                                </li>
+                            {% endif %}
+                            {% if user_role == 'student' or user_role == 'parent' %}
+                                <li class="nav-item">
+                                    <a class="nav-link {% if 'certificates' in request.path %}active{% endif %}" href="{% url 'certificate-list' %}">
+                                        {% trans "Сертификаты" %}
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    </header>
 
     <!-- Main Content -->
-    <main class="container mt-4 mb-5">
+    <main>
         {% if messages %}
-            <div class="row">
-                <div class="col-12">
-                    {% for message in messages %}
-                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                            {{ message }}
-                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                        </div>
-                    {% endfor %}
+            <div class="container mt-4">
+                <div class="row">
+                    <div class="col-12">
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         {% endif %}
@@ -160,33 +138,42 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-dark text-white py-4 mt-auto">
+    <footer>
         <div class="container">
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-md-4 mb-4 mb-md-0">
                     <h5>{% trans "О проекте" %}</h5>
                     <p>{% trans "Онлайн-академия детской онкологии и онкогематологии - платформа для обучения врачей, студентов и родителей." %}</p>
+                    <div class="social-icons mt-3">
+                        <a href="#" class="text-white me-2"><i class="fab fa-facebook-f"></i></a>
+                        <a href="#" class="text-white me-2"><i class="fab fa-twitter"></i></a>
+                        <a href="#" class="text-white me-2"><i class="fab fa-instagram"></i></a>
+                        <a href="#" class="text-white"><i class="fab fa-youtube"></i></a>
+                    </div>
+                </div>
+                <div class="col-md-4 mb-4 mb-md-0">
+                    <h5>{% trans "Разделы" %}</h5>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><a href="{% url 'home' %}" class="text-white text-decoration-none">{% trans "Главная" %}</a></li>
+                        <li class="mb-2"><a href="{% url 'course-list' %}" class="text-white text-decoration-none">{% trans "Курсы" %}</a></li>
+                        {% if user.is_authenticated %}
+                        <li class="mb-2"><a href="{% url 'dashboard' %}" class="text-white text-decoration-none">{% trans "Личный кабинет" %}</a></li>
+                        <li><a href="{% url 'material-list' %}" class="text-white text-decoration-none">{% trans "Материалы" %}</a></li>
+                        {% endif %}
+                    </ul>
                 </div>
                 <div class="col-md-4">
                     <h5>{% trans "Контакты" %}</h5>
                     <ul class="list-unstyled">
-                        <li><i class="fas fa-envelope me-2"></i> info@oncology-academy.org</li>
-                        <li><i class="fas fa-phone me-2"></i> +996554160108 </li>
+                        <li class="mb-2"><i class="fas fa-envelope me-2"></i> info@oncology-academy.org</li>
+                        <li class="mb-2"><i class="fas fa-phone me-2"></i> +996 554 160 108</li>
+                        <li><i class="fas fa-map-marker-alt me-2"></i> {% trans "Бишкек, Кыргызстан" %}</li>
                     </ul>
                 </div>
-                <div class="col-md-4">
-                    <h5>{% trans "Следите за нами" %}</h5>
-                    <div class="social-icons">
-                        <a href="#" class="text-white me-2"><i class="fab fa-facebook-f fa-lg"></i></a>
-                        <a href="#" class="text-white me-2"><i class="fab fa-twitter fa-lg"></i></a>
-                        <a href="#" class="text-white me-2"><i class="fab fa-instagram fa-lg"></i></a>
-                        <a href="#" class="text-white"><i class="fab fa-youtube fa-lg"></i></a>
-                    </div>
-                </div>
             </div>
-            <hr>
+            <hr class="mt-4 mb-3 border-secondary opacity-25">
             <div class="text-center">
-                <p>&copy; {% now "Y" %} {% trans "Онлайн-академия детской онкологии. Все права защищены." %}</p>
+                <p class="mb-0">&copy; {% now "Y" %} {% trans "Онлайн-академия детской онкологии. Все права защищены." %}</p>
             </div>
         </div>
     </footer>
@@ -195,35 +182,6 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Custom JS -->
     <script src="{% static 'js/main.js' %}"></script>
-    <!-- Language switching JavaScript -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Fix language switcher forms
-            const languageForms = document.querySelectorAll('.language-switch-form');
-            languageForms.forEach(form => {
-                form.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    const formData = new FormData(form);
-                    
-                    fetch('{% url "set_language" %}', {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'X-CSRFToken': formData.get('csrfmiddlewaretoken')
-                        }
-                    })
-                    .then(response => {
-                        if (response.ok) {
-                            window.location.reload();
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error changing language:', error);
-                    });
-                });
-            });
-        });
-    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html> 

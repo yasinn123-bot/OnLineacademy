@@ -15,6 +15,7 @@ from django.core.cache import cache
 import uuid
 import json
 from django.contrib import messages
+import os
 
 from rest_framework import viewsets, permissions, status, generics
 from rest_framework.views import APIView
@@ -166,7 +167,7 @@ class CourseViewSet(viewsets.ModelViewSet):
                        status=status.HTTP_201_CREATED)
 
 class MaterialViewSet(viewsets.ModelViewSet):
-    queryset = Material.objects.all()
+    queryset = Material.objects.all().order_by('-created_at')
     serializer_class = MaterialSerializer
     authentication_classes = [JWTAuthentication, SessionAuthentication]
     
@@ -174,11 +175,11 @@ class MaterialViewSet(viewsets.ModelViewSet):
         user = self.request.user
         # Admins and content creators see all
         if user.is_staff or Material.objects.filter(author=user).exists():
-            return Material.objects.all()
+            return Material.objects.all().order_by('-created_at')
         # Filter by language or course if specified
         queryset = Material.objects.filter(
             Q(course__is_published=True) | Q(course__isnull=True)
-        )
+        ).order_by('-created_at')
         
         language = self.request.query_params.get('language')
         if language:
@@ -573,6 +574,47 @@ def material_detail(request, pk):
     return render(request, 'core/material_detail.html', context)
 
 @login_required
+def comment_create(request):
+    if request.method == 'POST':
+        content = request.POST.get('content')
+        material_id = request.POST.get('material_id')
+        parent_id = request.POST.get('parent_id')
+        
+        material = get_object_or_404(Material, id=material_id)
+        
+        if parent_id:
+            parent = get_object_or_404(Comment, id=parent_id)
+            Comment.objects.create(
+                content=content,
+                author=request.user,
+                material=material,
+                parent=parent
+            )
+        else:
+            Comment.objects.create(
+                content=content,
+                author=request.user,
+                material=material
+            )
+        
+        return redirect('material-detail', pk=material_id)
+    
+    return redirect('home')
+
+@login_required
+def comment_delete(request, pk):
+    comment = get_object_or_404(Comment, id=pk)
+    
+    # Check if the user is the author of the comment
+    if request.user == comment.author or request.user.is_staff:
+        material_id = comment.material.id
+        comment.delete()
+        return redirect('material-detail', pk=material_id)
+    
+    # If not authorized
+    return redirect('home')
+
+@login_required
 def test_detail(request, pk):
     test = get_object_or_404(Test.objects.select_related('course'), pk=pk)
     user_role = get_user_role(request.user)
@@ -740,7 +782,7 @@ class MaterialListView(ListView):
     
     def get_queryset(self):
         # Start with select_related for better performance
-        queryset = Material.objects.all().select_related('author', 'course')
+        queryset = Material.objects.all().select_related('author', 'course').order_by('-created_at')
         
         # Only doctors who created the materials can see unpublished ones
         user_role = get_user_role(self.request.user)
@@ -794,6 +836,28 @@ class MaterialCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     
     def form_valid(self, form):
         form.instance.author = self.request.user
+        
+        # For doctors, validate file type to ensure it's text-based
+        if get_user_role(self.request.user) == 'doctor':
+            file = self.request.FILES.get('file')
+            if file:
+                # List of allowed MIME types for text documents
+                allowed_types = [
+                    'application/pdf',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'application/msword',
+                    'text/plain'
+                ]
+                
+                # Check file extension as a fallback
+                file_ext = os.path.splitext(file.name)[1].lower()
+                allowed_extensions = ['.pdf', '.docx', '.doc', '.txt']
+                
+                content_type = file.content_type
+                if content_type not in allowed_types and file_ext not in allowed_extensions:
+                    messages.error(self.request, _("Только текстовые документы (PDF, DOCX, DOC, TXT) разрешены для загрузки врачами."))
+                    return self.form_invalid(form)
+        
         return super().form_valid(form)
     
     def get_context_data(self, **kwargs):
@@ -814,6 +878,30 @@ class MaterialUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
+    
+    def form_valid(self, form):
+        # For doctors, validate file type to ensure it's text-based
+        if get_user_role(self.request.user) == 'doctor' and 'file' in self.request.FILES:
+            file = self.request.FILES.get('file')
+            if file:
+                # List of allowed MIME types for text documents
+                allowed_types = [
+                    'application/pdf',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'application/msword',
+                    'text/plain'
+                ]
+                
+                # Check file extension as a fallback
+                file_ext = os.path.splitext(file.name)[1].lower()
+                allowed_extensions = ['.pdf', '.docx', '.doc', '.txt']
+                
+                content_type = file.content_type
+                if content_type not in allowed_types and file_ext not in allowed_extensions:
+                    messages.error(self.request, _("Только текстовые документы (PDF, DOCX, DOC, TXT) разрешены для загрузки врачами."))
+                    return self.form_invalid(form)
+        
+        return super().form_valid(form)
     
     def get_success_url(self):
         return reverse_lazy('material-detail', kwargs={'pk': self.object.pk})

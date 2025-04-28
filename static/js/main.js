@@ -1,4 +1,18 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // Authentication status check function
+    function checkAuthStatus() {
+        // Check for auth token in localStorage or sessionStorage
+        const token = localStorage.getItem('authToken') || sessionStorage.getItem('authToken');
+        
+        // If no token is found and user is on a protected page, redirect to login
+        if (!token && document.querySelector('meta[name="auth-required"]')) {
+            window.location.href = '/login/?next=' + encodeURIComponent(window.location.pathname);
+        }
+    }
+    
+    // Run auth check on page load
+    checkAuthStatus();
+
     // Initialize tooltips
     const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
     tooltipTriggerList.map(function(tooltipTriggerEl) {
@@ -350,44 +364,143 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Check if user is logged in on page load
-    const checkAuthStatus = () => {
-        const accessToken = getAccessToken();
-        
-        if (accessToken) {
-            // Verify token is valid
-            fetch('/api/token/verify/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ token: accessToken }),
-            })
-            .then(response => {
-                if (!response.ok) {
-                    // Try to refresh token
-                    return refreshToken().catch(() => {
-                        throw new Error('Authentication required');
-                    });
-                }
-                return true;
-            })
-            .catch(error => {
-                console.error('Auth check failed:', error);
-                
-                // Don't redirect on home or login pages
-                const path = window.location.pathname;
-                if (path !== '/' && !path.includes('/login') && !path.includes('/register')) {
-                    window.location.href = '/';
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href');
+            if (targetId === '#') return;
+            
+            const targetElement = document.querySelector(targetId);
+            if (targetElement) {
+                window.scrollTo({
+                    top: targetElement.offsetTop - 80,
+                    behavior: 'smooth'
+                });
+            }
+        });
+    });
+
+    // Add animation to progress bars
+    const progressBars = document.querySelectorAll('.progress-bar');
+    if (progressBars.length > 0) {
+        const animateProgressBars = () => {
+            progressBars.forEach(bar => {
+                const width = bar.getAttribute('aria-valuenow') + '%';
+                bar.style.width = '0%';
+                setTimeout(() => {
+                    bar.style.width = width;
+                    bar.style.transition = 'width 1s ease-in-out';
+                }, 100);
+            });
+        };
+
+        // Check if element is in viewport
+        const isInViewport = (element) => {
+            const rect = element.getBoundingClientRect();
+            return (
+                rect.top >= 0 &&
+                rect.left >= 0 &&
+                rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+                rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+            );
+        };
+
+        // Animate progress bars when they come into view
+        let animated = false;
+        window.addEventListener('scroll', () => {
+            if (!animated && progressBars.length > 0 && isInViewport(progressBars[0])) {
+                animateProgressBars();
+                animated = true;
+            }
+        });
+
+        // Initial check
+        if (isInViewport(progressBars[0])) {
+            animateProgressBars();
+            animated = true;
+        }
+    }
+
+    // Auto-hide alerts after 5 seconds
+    const alerts = document.querySelectorAll('.alert:not(.alert-permanent)');
+    alerts.forEach(alert => {
+        setTimeout(() => {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        }, 5000);
+    });
+
+    // Add animation to hero section
+    const heroSection = document.querySelector('.hero-section');
+    if (heroSection) {
+        heroSection.classList.add('animate__animated', 'animate__fadeIn');
+    }
+
+    // Highlight active section in navbar based on scroll position
+    const sections = document.querySelectorAll('section[id]');
+    if (sections.length > 0) {
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (pageYOffset >= sectionTop - 200) {
+                    current = section.getAttribute('id');
                 }
             });
-        } else {
-            // If no token found, don't redirect from protected pages
-            // User might be authenticated through Django sessions
-            // Removing the redirection code entirely
-        }
-    };
 
-    // Run auth check on page load
-    checkAuthStatus();
+            document.querySelectorAll('.navbar-nav a').forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    }
+
+    // Course search filter functionality
+    const searchForm = document.querySelector('form[action*="course-list"]');
+    if (searchForm) {
+        const searchInput = searchForm.querySelector('input[name="search"]');
+        const searchButton = searchForm.querySelector('button[type="submit"]');
+        
+        // Disable empty searches
+        searchForm.addEventListener('submit', function(e) {
+            if (searchInput.value.trim() === '') {
+                e.preventDefault();
+                searchInput.classList.add('is-invalid');
+                setTimeout(() => {
+                    searchInput.classList.remove('is-invalid');
+                }, 3000);
+            }
+        });
+
+        // Enable search button only when input has content
+        searchInput.addEventListener('input', function() {
+            if (this.value.trim() !== '') {
+                searchButton.disabled = false;
+            } else {
+                searchButton.disabled = true;
+            }
+        });
+
+        // Initialize search button state
+        if (searchInput.value.trim() === '') {
+            searchButton.disabled = true;
+        }
+    }
+
+    // Animate cards on hover
+    const cards = document.querySelectorAll('.card');
+    cards.forEach(card => {
+        card.addEventListener('mouseenter', function() {
+            this.style.transform = 'translateY(-10px)';
+            this.style.boxShadow = '0 15px 30px rgba(0, 0, 0, 0.1)';
+        });
+        card.addEventListener('mouseleave', function() {
+            this.style.transform = 'translateY(0)';
+            this.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
+        });
+    });
 }); 
