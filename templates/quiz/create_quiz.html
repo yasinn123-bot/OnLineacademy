@@ -2,7 +2,7 @@
 {% load static %}
 {% load i18n %}
 
-{% block title %}{% trans "Создать новый тест" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+{% block title %}{% trans "Создание теста" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -11,7 +11,7 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{% url 'quiz:quiz_list' %}">{% trans "Тесты" %}</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">{% trans "Создать новый тест" %}</li>
+                    <li class="breadcrumb-item active" aria-current="page">{% trans "Создание теста" %}</li>
                 </ol>
             </nav>
         </div>
@@ -21,75 +21,203 @@
         <div class="col-lg-8 mx-auto">
             <div class="card shadow">
                 <div class="card-header bg-primary text-white">
-                    <h4 class="mb-0">{% trans "Создать новый тест" %}</h4>
+                    <h4 class="mb-0">{% trans "Создание нового теста" %}</h4>
                 </div>
                 <div class="card-body">
-                    <form method="post" action="{% url 'quiz:create_quiz' %}">
+                    <form method="post" id="createQuizForm">
                         {% csrf_token %}
                         
-                        {% if messages %}
-                            {% for message in messages %}
-                                <div class="alert alert-{{ message.tags }}">
-                                    {{ message }}
-                                </div>
-                            {% endfor %}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
                         {% endif %}
                         
-                        <div class="mb-3">
-                            <label for="title" class="form-label">{% trans "Название теста" %}*</label>
-                            <input type="text" class="form-control" id="title" name="title" required>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="description" class="form-label">{% trans "Описание" %}</label>
-                            <textarea class="form-control" id="description" name="description" rows="4"></textarea>
-                            <small class="form-text text-muted">{% trans "Опишите, о чем этот тест, какие знания он проверяет." %}</small>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="course" class="form-label">{% trans "Курс" %}</label>
-                            <select class="form-select" id="course" name="course">
-                                <option value="">{% trans "Выберите курс" %} ({% trans "не обязательно" %})</option>
-                                {% for course in courses %}
-                                    <option value="{{ course.id }}">{{ course.title }}</option>
-                                {% endfor %}
-                            </select>
-                            <small class="form-text text-muted">{% trans "Вы можете привязать тест к конкретному курсу или оставить его как отдельное задание." %}</small>
-                        </div>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="time_limit" class="form-label">{% trans "Ограничение по времени (мин.)" %}</label>
-                                <input type="number" class="form-control" id="time_limit" name="time_limit" value="30" min="1" max="180">
+                        <div class="mb-4">
+                            <h5 class="mb-3 border-bottom pb-2">{% trans "Основная информация" %}</h5>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.title.id_for_label }}" class="form-label">
+                                    {% trans "Название теста" %} <span class="text-danger">*</span>
+                                </label>
+                                {{ form.title }}
+                                {% if form.title.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.title.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">{% trans "Введите понятное название теста, которое отражает его содержание." %}</div>
                             </div>
-                            <div class="col-md-6">
-                                <label for="passing_score" class="form-label">{% trans "Проходной балл (%)" %}</label>
-                                <input type="number" class="form-control" id="passing_score" name="passing_score" value="70" min="1" max="100">
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.description.id_for_label }}" class="form-label">
+                                    {% trans "Описание" %}
+                                </label>
+                                {{ form.description }}
+                                {% if form.description.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.description.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">{% trans "Опишите, что проверяет этот тест и какие знания потребуются." %}</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="{{ form.course.id_for_label }}" class="form-label">
+                                    {% trans "Курс" %}
+                                </label>
+                                {{ form.course }}
+                                {% if form.course.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in form.course.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">{% trans "Выберите курс, к которому относится тест, или оставьте пустым для независимого теста." %}</div>
                             </div>
                         </div>
                         
-                        <div class="mb-4 form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="is_published" name="is_published">
-                            <label class="form-check-label" for="is_published">{% trans "Опубликовать (тест будет доступен всем пользователям)" %}</label>
+                        <div class="mb-4">
+                            <h5 class="mb-3 border-bottom pb-2">{% trans "Настройки теста" %}</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.time_limit.id_for_label }}" class="form-label">
+                                            {% trans "Ограничение времени (мин)" %}
+                                        </label>
+                                        {{ form.time_limit }}
+                                        {% if form.time_limit.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.time_limit.errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">{% trans "Время в минутах на выполнение теста." %}</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="{{ form.passing_score.id_for_label }}" class="form-label">
+                                            {% trans "Проходной балл (%)" %}
+                                        </label>
+                                        {{ form.passing_score }}
+                                        {% if form.passing_score.errors %}
+                                            <div class="invalid-feedback d-block">
+                                                {% for error in form.passing_score.errors %}
+                                                    {{ error }}
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                        <div class="form-text">{% trans "Минимальный процент для успешного прохождения." %}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    {{ form.is_published }}
+                                    <label class="form-check-label" for="{{ form.is_published.id_for_label }}">
+                                        {% trans "Опубликовать тест сразу" %}
+                                    </label>
+                                </div>
+                                <div class="form-text">{% trans "Если не выбрано, тест будет сохранен как черновик." %}</div>
+                            </div>
                         </div>
                         
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-between">
+                        <div class="alert alert-info">
+                            <div class="d-flex">
+                                <div class="me-3">
+                                    <i class="fas fa-info-circle fa-2x"></i>
+                                </div>
+                                <div>
+                                    <h5 class="alert-heading">{% trans "Следующие шаги" %}</h5>
+                                    <p class="mb-0">{% trans "После создания теста вы сможете добавить к нему вопросы разных типов: с одним правильным ответом, множественным выбором, верно/неверно и с коротким текстовым ответом." %}</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
                             <a href="{% url 'quiz:quiz_list' %}" class="btn btn-outline-secondary">
-                                <i class="fas fa-arrow-left me-2"></i>{% trans "Назад" %}
+                                <i class="fas fa-times me-1"></i>{% trans "Отмена" %}
                             </a>
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-2"></i>{% trans "Создать тест" %}
+                                <i class="fas fa-save me-1"></i>{% trans "Создать тест" %}
                             </button>
                         </div>
                     </form>
                 </div>
-                <div class="card-footer bg-light">
-                    <div class="small text-muted">
-                        <i class="fas fa-info-circle me-1"></i> {% trans "После создания теста вы сможете добавить вопросы." %}
+            </div>
+            
+            <div class="card shadow mt-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">{% trans "Советы по созданию эффективных тестов" %}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>{% trans "Рекомендации" %}</h6>
+                            <ul class="small">
+                                <li>{% trans "Формулируйте вопросы четко и однозначно" %}</li>
+                                <li>{% trans "Используйте разные типы вопросов для проверки разных навыков" %}</li>
+                                <li>{% trans "Размещайте варианты ответов в логическом порядке" %}</li>
+                                <li>{% trans "Создавайте вопросы, соответствующие изученному материалу" %}</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="mb-2"><i class="fas fa-times-circle text-danger me-2"></i>{% trans "Чего следует избегать" %}</h6>
+                            <ul class="small">
+                                <li>{% trans "Двусмысленных или запутанных формулировок" %}</li>
+                                <li>{% trans "Слишком очевидных неправильных вариантов" %}</li>
+                                <li>{% trans "Вопросов с подсказками к ответу" %}</li>
+                                <li>{% trans "Повторения одних и тех же вопросов" %}</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Apply Bootstrap classes to form elements
+        const formElements = document.querySelectorAll('#createQuizForm input[type=text], #createQuizForm input[type=number], #createQuizForm textarea, #createQuizForm select');
+        formElements.forEach(function(element) {
+            element.classList.add('form-control');
+            
+            if (element.hasAttribute('required')) {
+                element.classList.add('border-primary');
+            }
+        });
+        
+        // Apply Bootstrap form-check-input class to checkboxes
+        const checkboxes = document.querySelectorAll('#createQuizForm input[type=checkbox]');
+        checkboxes.forEach(function(checkbox) {
+            checkbox.classList.add('form-check-input');
+        });
+        
+        // Show course field only if course is selected in URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const courseParam = urlParams.get('course');
+        
+        if (courseParam) {
+            const courseSelect = document.querySelector('#id_course');
+            if (courseSelect) {
+                courseSelect.value = courseParam;
+            }
+        }
+    });
+</script>
 {% endblock %} 

@@ -5,90 +5,237 @@
 {% block title %}{% trans "Регистрация" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
-        <div class="card shadow">
-            <div class="card-body p-5">
-                <h2 class="text-center mb-4">{% trans "Регистрация" %}</h2>
-                
-                <div id="register-error" class="alert alert-danger d-none" role="alert"></div>
-                
-                {% if errors %}
-                <div class="alert alert-danger" role="alert">
-                    <ul class="mb-0">
-                        {% for error in errors %}
-                        <li>{{ error }}</li>
-                        {% endfor %}
-                    </ul>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">{% trans "Регистрация" %}</h3>
                 </div>
-                {% endif %}
-                
-                <form id="register-form" method="post" action="{% url 'register' %}">
-                    {% csrf_token %}
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="first_name" class="form-label">{% trans "Имя" %} *</label>
-                            <input type="text" class="form-control" id="first_name" name="first_name" required>
+                <div class="card-body">
+                    <form method="post" id="registrationForm" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        {% if form.errors %}
+                            <div class="alert alert-danger">
+                                {% for field in form %}
+                                    {% for error in field.errors %}
+                                        <p>{{ field.label }}: {{ error }}</p>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% for error in form.non_field_errors %}
+                                    <p>{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }}">
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                        
+                        <div class="mb-4">
+                            <h5 class="mb-3 border-bottom pb-2">{% trans "Основная информация" %}</h5>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="id_first_name" class="form-label">{% trans "Имя" %} <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="id_first_name" name="first_name" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="id_last_name" class="form-label">{% trans "Фамилия" %} <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="id_last_name" name="last_name" required>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="id_email" class="form-label">{% trans "Email" %} <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="id_email" name="email" required>
+                                <div class="form-text">{% trans "Email будет использоваться для входа в систему" %}</div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="id_username" class="form-label">{% trans "Имя пользователя" %} <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="id_username" name="username" required>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="id_password1" class="form-label">{% trans "Пароль" %} <span class="text-danger">*</span></label>
+                                    <input type="password" class="form-control" id="id_password1" name="password1" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="id_password2" class="form-label">{% trans "Повторите пароль" %} <span class="text-danger">*</span></label>
+                                    <input type="password" class="form-control" id="id_password2" name="password2" required>
+                                </div>
+                            </div>
+                            <div class="form-text mb-3">
+                                <ul class="small">
+                                    <li>{% trans "Пароль должен содержать не менее 8 символов" %}</li>
+                                    <li>{% trans "Пароль не может быть слишком простым" %}</li>
+                                    <li>{% trans "Пароль не может состоять только из цифр" %}</li>
+                                </ul>
+                            </div>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
-                            <label for="last_name" class="form-label">{% trans "Фамилия" %} *</label>
-                            <input type="text" class="form-control" id="last_name" name="last_name" required>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="username" class="form-label">{% trans "Имя пользователя" %} *</label>
-                        <input type="text" class="form-control" id="username" name="username" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="email" class="form-label">{% trans "Email" %} *</label>
-                        <input type="email" class="form-control" id="email" name="email" required>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="password" class="form-label">{% trans "Пароль" %} *</label>
-                            <input type="password" class="form-control" id="password" name="password" required>
+                        <div class="mb-4">
+                            <h5 class="mb-3 border-bottom pb-2">{% trans "Дополнительная информация" %}</h5>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">{% trans "Тип аккаунта" %} <span class="text-danger">*</span></label>
+                                <div id="roleSelector">
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="radio" name="role" id="role_student" value="student" checked>
+                                        <label class="form-check-label" for="role_student">
+                                            <i class="fas fa-user-graduate me-1"></i> {% trans "Студент" %}
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="radio" name="role" id="role_doctor" value="doctor">
+                                        <label class="form-check-label" for="role_doctor">
+                                            <i class="fas fa-user-md me-1"></i> {% trans "Врач" %}
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="role" id="role_parent" value="parent">
+                                        <label class="form-check-label" for="role_parent">
+                                            <i class="fas fa-user-friends me-1"></i> {% trans "Родитель" %}
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="id_profile_picture" class="form-label">{% trans "Фото профиля" %}</label>
+                                <input type="file" class="form-control" id="id_profile_picture" name="profile_picture" accept="image/*">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="id_bio" class="form-label">{% trans "О себе" %}</label>
+                                <textarea class="form-control" id="id_bio" name="bio" rows="3"></textarea>
+                                <div class="form-text">{% trans "Расскажите немного о себе, своих профессиональных интересах или опыте" %}</div>
+                            </div>
+                            
+                            <!-- Doctor verification fields, only shown when doctor role is selected -->
+                            <div id="doctorFields" style="display: none;">
+                                <div class="alert alert-info mb-3">
+                                    <div class="d-flex">
+                                        <div class="me-3">
+                                            <i class="fas fa-info-circle fa-2x"></i>
+                                        </div>
+                                        <div>
+                                            <h5 class="alert-heading">{% trans "Информация для врачей" %}</h5>
+                                            <p class="mb-0">
+                                                {% trans "Для регистрации в качестве врача потребуется дополнительная верификация. После регистрации администратор проверит указанные данные." %}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="id_specialty" class="form-label">{% trans "Специальность" %} <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="id_specialty" name="specialty">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="id_institution" class="form-label">{% trans "Медицинское учреждение" %} <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="id_institution" name="institution">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="id_license_number" class="form-label">{% trans "Номер лицензии/сертификата" %}</label>
+                                    <input type="text" class="form-control" id="id_license_number" name="license_number">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="id_credentials_document" class="form-label">{% trans "Документ, подтверждающий квалификацию" %}</label>
+                                    <input type="file" class="form-control" id="id_credentials_document" name="credentials_document">
+                                    <div class="form-text">{% trans "Загрузите скан диплома, лицензии или другого документа, подтверждающего вашу квалификацию (PDF, JPG, PNG)" %}</div>
+                                </div>
+                            </div>
                         </div>
                         
-                        <div class="col-md-6 mb-3">
-                            <label for="password_confirm" class="form-label">{% trans "Подтверждение пароля" %} *</label>
-                            <input type="password" class="form-control" id="password_confirm" name="password_confirm" required>
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="id_terms" name="terms" required>
+                            <label class="form-check-label" for="id_terms">
+                                {% trans "Я согласен с" %} <a href="#" target="_blank">{% trans "условиями использования" %}</a> {% trans "и" %} <a href="#" target="_blank">{% trans "политикой конфиденциальности" %}</a>
+                            </label>
                         </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="role" class="form-label">{% trans "Кем вы являетесь" %} *</label>
-                        <select class="form-select" id="role" name="role" required>
-                            <option value="" selected disabled>{% trans "Выберите роль" %}</option>
-                            <option value="doctor">{% trans "Врач" %}</option>
-                            <option value="student">{% trans "Студент" %}</option>
-                            <option value="parent">{% trans "Родитель" %}</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="terms_accepted" name="terms_accepted" required>
-                        <label class="form-check-label" for="terms_accepted">
-                            {% trans "Я согласен с" %} <a href="#">{% trans "условиями использования" %}</a>
-                        </label>
-                    </div>
-                    
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary btn-lg">
-                            <i class="fas fa-user-plus me-2"></i>{% trans "Зарегистрироваться" %}
-                        </button>
-                    </div>
-                </form>
-                
-                <div class="mt-4 text-center">
-                    <p>{% trans "Уже есть аккаунт?" %} <a href="{% url 'login' %}">{% trans "Войти" %}</a></p>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-user-plus me-2"></i>{% trans "Зарегистрироваться" %}
+                            </button>
+                            <div class="text-center mt-3">
+                                {% trans "Уже есть аккаунт?" %} <a href="{% url 'login' %}">{% trans "Войти" %}</a>
+                            </div>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Role selector logic
+        const roleSelectors = document.querySelectorAll('input[name="role"]');
+        const doctorFields = document.getElementById('doctorFields');
+        
+        // Function to toggle doctor fields visibility
+        function toggleDoctorFields() {
+            const doctorSelected = document.getElementById('role_doctor').checked;
+            doctorFields.style.display = doctorSelected ? 'block' : 'none';
+            
+            // Toggle required attribute for doctor fields when doctor role is selected
+            const doctorInputs = doctorFields.querySelectorAll('input[type="text"]');
+            doctorInputs.forEach(input => {
+                if (input.id === 'id_specialty' || input.id === 'id_institution') {
+                    input.required = doctorSelected;
+                }
+            });
+        }
+        
+        // Add event listeners to role selectors
+        roleSelectors.forEach(function(selector) {
+            selector.addEventListener('change', toggleDoctorFields);
+        });
+        
+        // Run once on page load
+        toggleDoctorFields();
+        
+        // Form validation
+        const form = document.getElementById('registrationForm');
+        form.addEventListener('submit', function(event) {
+            const password1 = document.getElementById('id_password1').value;
+            const password2 = document.getElementById('id_password2').value;
+            
+            if (password1 !== password2) {
+                event.preventDefault();
+                alert('{% trans "Пароли не совпадают" %}');
+                return false;
+            }
+            
+            const doctorSelected = document.getElementById('role_doctor').checked;
+            if (doctorSelected) {
+                const specialty = document.getElementById('id_specialty').value;
+                const institution = document.getElementById('id_institution').value;
+                
+                if (!specialty || !institution) {
+                    event.preventDefault();
+                    alert('{% trans "Для регистрации в качестве врача необходимо заполнить поля Специальность и Медицинское учреждение" %}');
+                    return false;
+                }
+            }
+            
+            return true;
+        });
+    });
+</script>
 {% endblock %} 
