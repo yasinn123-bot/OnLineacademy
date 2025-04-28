@@ -1,0 +1,296 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{{ lesson.title }} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'course-list' %}">{% trans "Курсы" %}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'course-detail' lesson.course.id %}">{{ lesson.course.title }}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ lesson.title }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-9">
+            <!-- Progress Indicator -->
+            <div class="progress mb-4" style="height: 8px;">
+                <div class="progress-bar bg-success" role="progressbar" 
+                     style="width: {{ current_step_percentage }}%;" 
+                     aria-valuenow="{{ current_step }}" 
+                     aria-valuemin="0" 
+                     aria-valuemax="{{ total_steps }}"></div>
+            </div>
+            
+            <!-- Lesson Content Card -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">{{ lesson.title }}</h4>
+                    <span class="badge bg-primary">{% trans "Шаг" %} {{ current_step }}/{{ total_steps }}</span>
+                </div>
+                <div class="card-body lesson-content">
+                    <h5 class="mb-3">{{ current_content.title }}</h5>
+                    
+                    {% if current_content.image %}
+                    <div class="mb-4 text-center">
+                        <img src="{{ current_content.image.url }}" alt="{{ current_content.title }}" class="img-fluid rounded lesson-image">
+                    </div>
+                    {% endif %}
+                    
+                    <div class="lesson-text">
+                        {{ current_content.content|safe }}
+                    </div>
+                    
+                    {% if current_content.code_snippet %}
+                    <div class="code-block mt-4 mb-4">
+                        <div class="code-header d-flex justify-content-between align-items-center p-2 bg-light">
+                            <span>{% trans "Пример кода" %}</span>
+                            <button class="btn btn-sm btn-outline-secondary copy-code-btn">
+                                <i class="fas fa-copy"></i> {% trans "Копировать" %}
+                            </button>
+                        </div>
+                        <pre class="p-3 bg-dark text-light rounded-0 mb-0"><code>{{ current_content.code_snippet }}</code></pre>
+                    </div>
+                    {% endif %}
+                    
+                    {% if current_step == total_steps %}
+                    <div class="alert alert-success mt-4">
+                        <i class="fas fa-check-circle me-2"></i>
+                        {% trans "Поздравляем! Вы завершили этот урок." %}
+                        {% if lesson.quiz %}
+                        <p class="mt-2 mb-0">
+                            {% trans "Теперь вы можете пройти тест для проверки знаний." %}
+                        </p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer bg-white">
+                    <div class="d-flex justify-content-between">
+                        {% if current_step > 1 %}
+                        <a href="{% url 'lesson-detail' lesson.id %}?step={{ current_step|add:'-1' }}" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left me-2"></i>{% trans "Предыдущий" %}
+                        </a>
+                        {% else %}
+                        <div></div>
+                        {% endif %}
+                        
+                        {% if current_step < total_steps %}
+                        <a href="{% url 'lesson-detail' lesson.id %}?step={{ current_step|add:'1' }}" class="btn btn-primary" id="next-step-btn">
+                            {% trans "Далее" %} <i class="fas fa-arrow-right ms-2"></i>
+                        </a>
+                        {% else %}
+                        {% if lesson.quiz %}
+                        <a href="{% url 'quiz:quiz_detail' lesson.quiz.id %}" class="btn btn-success">
+                            <i class="fas fa-question-circle me-2"></i>{% trans "Перейти к тесту" %}
+                        </a>
+                        {% else %}
+                        <a href="{% url 'course-detail' lesson.course.id %}" class="btn btn-success">
+                            <i class="fas fa-check-circle me-2"></i>{% trans "Завершить урок" %}
+                        </a>
+                        {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <!-- Lesson Navigation Sidebar -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">{% trans "Содержание урока" %}</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for step in lesson_steps %}
+                        <a href="{% url 'lesson-detail' lesson.id %}?step={{ forloop.counter }}" 
+                           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center
+                                  {% if forloop.counter == current_step %}active{% endif %}
+                                  {% if forloop.counter < current_step %}completed{% endif %}">
+                            <div>
+                                <span class="step-number me-2">{{ forloop.counter }}</span>
+                                <span class="step-title">{{ step.title|truncatechars:30 }}</span>
+                            </div>
+                            {% if forloop.counter < current_step %}
+                            <i class="fas fa-check-circle text-success"></i>
+                            {% elif forloop.counter == current_step %}
+                            <i class="fas fa-circle text-primary"></i>
+                            {% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Resources -->
+            {% if lesson.additional_resources.exists %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">{% trans "Дополнительные материалы" %}</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group list-group-flush">
+                        {% for resource in lesson.additional_resources.all %}
+                        <li class="list-group-item">
+                            <i class="{% if resource.resource_type == 'video' %}fas fa-video{% elif resource.resource_type == 'document' %}fas fa-file-alt{% else %}fas fa-link{% endif %} me-2"></i>
+                            <a href="{{ resource.url }}" target="_blank" class="text-decoration-none">{{ resource.title }}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Course Progress -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">{% trans "Прогресс курса" %}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span>{% trans "Общий прогресс" %}</span>
+                            <span>{{ course_progress }}%</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ course_progress }}%;" 
+                                 aria-valuenow="{{ course_progress }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center">
+                        <a href="{% url 'course-detail' lesson.course.id %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-arrow-left me-2"></i>{% trans "Вернуться к курсу" %}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .lesson-content {
+        min-height: 400px;
+    }
+    
+    .lesson-image {
+        max-height: 400px;
+        object-fit: contain;
+    }
+    
+    .step-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background-color: #e9ecef;
+        color: #495057;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    
+    .list-group-item.active .step-number {
+        background-color: #fff;
+        color: #0d6efd;
+    }
+    
+    .list-group-item.completed {
+        background-color: #f8f9fa;
+    }
+    
+    .list-group-item.completed .step-number {
+        background-color: #28a745;
+        color: #fff;
+    }
+    
+    .code-block {
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    
+    pre {
+        margin-bottom: 0;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    #next-step-btn {
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.4);
+        }
+        70% {
+            box-shadow: 0 0 0 10px rgba(13, 110, 253, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(13, 110, 253, 0);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Copy code function
+        const copyButtons = document.querySelectorAll('.copy-code-btn');
+        copyButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const codeBlock = this.closest('.code-block').querySelector('code');
+                const textArea = document.createElement('textarea');
+                textArea.value = codeBlock.textContent;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                // Change button text temporarily
+                const originalText = this.innerHTML;
+                this.innerHTML = '<i class="fas fa-check"></i> {% trans "Скопировано" %}';
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                }, 2000);
+            });
+        });
+        
+        // Mark step as completed when navigating away
+        const nextButton = document.getElementById('next-step-btn');
+        if (nextButton) {
+            nextButton.addEventListener('click', function(e) {
+                // You can add AJAX call here to mark the step as completed
+                // For example:
+                /*
+                fetch('{% url "mark_step_completed" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        lesson_id: '{{ lesson.id }}',
+                        step: '{{ current_step }}'
+                    })
+                });
+                */
+            });
+        }
+    });
+</script>
+{% endblock %} 

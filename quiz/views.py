@@ -14,11 +14,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 
-from .models import Quiz, Question, Choice, QuizAttempt, Answer
+from .models import Quiz, Question, Choice, QuizAttempt, StudentAnswer
 from .serializers import (
     QuizListSerializer, QuizDetailSerializer, QuizCreateUpdateSerializer,
     QuestionCreateSerializer, QuestionSerializer, ChoiceSerializer,
-    QuizAttemptListSerializer, QuizAttemptDetailSerializer, AnswerSerializer
+    QuizAttemptListSerializer, QuizAttemptDetailSerializer, StudentAnswerSerializer
 )
 from core.models import Course, CustomUser
 from .forms import QuizForm, QuestionForm
@@ -143,7 +143,7 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
             )
         
         # Check if question was already answered
-        if Answer.objects.filter(attempt=attempt, question=question).exists():
+        if StudentAnswer.objects.filter(attempt=attempt, question=question).exists():
             return Response(
                 {"detail": _("This question was already answered")}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -151,7 +151,7 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
         
         # Create the answer
         with transaction.atomic():
-            answer = Answer.objects.create(
+            answer = StudentAnswer.objects.create(
                 attempt=attempt,
                 question=question,
                 text_answer=text_answer
@@ -202,11 +202,11 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
         
         # Check if all questions have been answered
         total_questions = attempt.quiz.questions.count()
-        answered_questions = Answer.objects.filter(attempt=attempt).count()
+        answered_questions = StudentAnswer.objects.filter(attempt=attempt).count()
         
         if answered_questions >= total_questions:
             # Complete the attempt
-            total_points = Answer.objects.filter(attempt=attempt).aggregate(
+            total_points = StudentAnswer.objects.filter(attempt=attempt).aggregate(
                 total=Sum('points_earned')
             )['total'] or 0
             
@@ -221,7 +221,7 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
             
             attempt.save()
         
-        serializer = AnswerSerializer(answer)
+        serializer = StudentAnswerSerializer(answer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
     @action(detail=True, methods=['post'])
@@ -245,7 +245,7 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
         
         # Complete the attempt
         with transaction.atomic():
-            total_points = Answer.objects.filter(attempt=attempt).aggregate(
+            total_points = StudentAnswer.objects.filter(attempt=attempt).aggregate(
                 total=Sum('points_earned')
             )['total'] or 0
             
@@ -359,7 +359,7 @@ def take_quiz(request, pk):
     
     # Get questions and answered question IDs
     questions = Question.objects.filter(quiz=quiz).prefetch_related('choices')
-    answered_questions = Answer.objects.filter(
+    answered_questions = StudentAnswer.objects.filter(
         attempt=attempt
     ).values_list('question_id', flat=True)
     
@@ -406,12 +406,12 @@ def submit_answer(request, attempt_id):
     question = get_object_or_404(Question, pk=question_id, quiz=attempt.quiz)
     
     # Check if already answered
-    if Answer.objects.filter(attempt=attempt, question=question).exists():
+    if StudentAnswer.objects.filter(attempt=attempt, question=question).exists():
         return JsonResponse({'error': _('Question already answered')}, status=400)
     
     # Process the answer
     with transaction.atomic():
-        answer = Answer(
+        answer = StudentAnswer(
             attempt=attempt,
             question=question,
             is_correct=False,
@@ -468,11 +468,11 @@ def submit_answer(request, attempt_id):
         
         # Check if all questions are now answered
         total_questions = attempt.quiz.questions.count()
-        answered_questions = Answer.objects.filter(attempt=attempt).count()
+        answered_questions = StudentAnswer.objects.filter(attempt=attempt).count()
         
         if answered_questions >= total_questions:
             # Complete the attempt
-            total_points = Answer.objects.filter(attempt=attempt).aggregate(
+            total_points = StudentAnswer.objects.filter(attempt=attempt).aggregate(
                 total=Sum('points_earned')
             )['total'] or 0
             
@@ -505,7 +505,7 @@ def quiz_results(request, attempt_id):
         return redirect('take_quiz', pk=attempt.quiz.id)
     
     # Get all answers with questions and choices
-    answers = Answer.objects.filter(attempt=attempt).select_related('question')
+    answers = StudentAnswer.objects.filter(attempt=attempt).select_related('question')
     
     context = {
         'quiz': attempt.quiz,

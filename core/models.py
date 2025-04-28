@@ -34,6 +34,136 @@ class Course(models.Model):
     
     def __str__(self):
         return self.title
+    
+    @property
+    def lesson_count(self):
+        """Return total number of lessons in the course"""
+        count = 0
+        for module in self.modules.all():
+            count += module.lessons.count()
+        return count
+    
+    @property
+    def quiz_count(self):
+        """Return total number of quizzes in the course"""
+        count = 0
+        for module in self.modules.all():
+            if module.quiz:
+                count += 1
+        return count
+    
+    @property
+    def total_duration(self):
+        """Return total estimated time to complete the course in minutes"""
+        duration = 0
+        for module in self.modules.all():
+            for lesson in module.lessons.all():
+                duration += lesson.estimated_time
+            if module.quiz:
+                duration += module.quiz.time_limit
+        return duration
+
+
+class Module(models.Model):
+    """Course module - a group of related lessons and a quiz"""
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='modules')
+    title = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    order = models.PositiveIntegerField(default=1)
+    
+    class Meta:
+        ordering = ['order']
+        unique_together = ('course', 'order')
+    
+    def __str__(self):
+        return f"{self.course.title} - {self.title}"
+    
+    @property
+    def progress_percentage(self):
+        """Calculate completion percentage for this module"""
+        # Logic to be implemented based on UserProgress
+        return 0
+    
+    @property
+    def completed(self):
+        """Check if all lessons and quiz in this module are completed"""
+        # Logic to be implemented based on UserProgress
+        return False
+
+
+class Lesson(models.Model):
+    """A lesson within a module - contains multiple content steps"""
+    module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='lessons')
+    title = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    order = models.PositiveIntegerField(default=1)
+    estimated_time = models.PositiveIntegerField(default=15, help_text=_('Estimated time to complete in minutes'))
+    quiz = models.OneToOneField('quiz.Quiz', on_delete=models.SET_NULL, null=True, blank=True, related_name='lesson')
+    
+    class Meta:
+        ordering = ['order']
+        unique_together = ('module', 'order')
+    
+    def __str__(self):
+        return self.title
+    
+    @property
+    def course(self):
+        """Get the course that this lesson belongs to"""
+        return self.module.course
+    
+    @property
+    def is_current(self):
+        """Check if this is the current lesson for the user to study"""
+        # Logic to be implemented
+        return False
+
+
+class LessonContent(models.Model):
+    """Individual content step within a lesson"""
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='steps')
+    title = models.CharField(max_length=100)
+    content = models.TextField(help_text=_('HTML content for this step'))
+    order = models.PositiveIntegerField(default=1)
+    image = models.ImageField(upload_to='lesson_images/', null=True, blank=True)
+    code_snippet = models.TextField(blank=True, null=True, help_text=_('Optional code snippet for this step'))
+    
+    class Meta:
+        ordering = ['order']
+        unique_together = ('lesson', 'order')
+    
+    def __str__(self):
+        return f"{self.lesson.title} - {self.title}"
+
+
+class AdditionalResource(models.Model):
+    """Additional learning resources for a lesson"""
+    RESOURCE_TYPES = (
+        ('video', _('Видео')),
+        ('document', _('Документ')),
+        ('link', _('Ссылка')),
+    )
+    
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='additional_resources')
+    title = models.CharField(max_length=100)
+    url = models.URLField()
+    resource_type = models.CharField(max_length=20, choices=RESOURCE_TYPES, default='link')
+    
+    def __str__(self):
+        return self.title
+
+
+class LearningOutcome(models.Model):
+    """Learning outcomes for a course"""
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='learning_outcomes')
+    text = models.CharField(max_length=255)
+    order = models.PositiveIntegerField(default=1)
+    
+    class Meta:
+        ordering = ['order']
+    
+    def __str__(self):
+        return self.text
 
 
 class MaterialType(models.TextChoices):
@@ -134,6 +264,8 @@ class UserProgress(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='user_progress')
     materials_completed = models.ManyToManyField(Material, related_name='completed_by')
     tests_completed = models.ManyToManyField(Test, related_name='completed_by')
+    lessons_completed = models.ManyToManyField(Lesson, related_name='completed_by')
+    lesson_steps_completed = models.JSONField(default=dict, blank=True, help_text=_('JSON containing lesson_id:step_number pairs for completed steps'))
     last_access = models.DateTimeField(auto_now=True)
     
     class Meta:

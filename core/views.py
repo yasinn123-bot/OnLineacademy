@@ -16,6 +16,8 @@ import uuid
 import json
 from django.contrib import messages
 import os
+from django.views.decorators.http import require_POST
+from django.utils import timezone
 
 from rest_framework import viewsets, permissions, status, generics
 from rest_framework.views import APIView
@@ -28,7 +30,7 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .models import (
     CustomUser, Course, Material, Comment, Test, Question, Answer,
-    Certificate, UserProgress
+    Certificate, UserProgress, Module, Lesson, LessonContent, LearningOutcome
 )
 from .serializers import (
     CustomUserSerializer, CourseSerializer, MaterialSerializer,
@@ -36,7 +38,9 @@ from .serializers import (
     AnswerSerializer, CertificateSerializer, UserProgressSerializer,
     RegisterSerializer, LoginSerializer
 )
-from .forms import CourseForm, MaterialForm
+from .forms import (
+    CourseForm, MaterialForm, CommentForm, ModuleForm, LessonForm, LessonContentForm
+)
 
 # Helper functions
 def get_user_role(user):
@@ -427,51 +431,121 @@ def logout_view(request):
 @login_required
 def dashboard(request):
     user = request.user
-    user_role = get_user_role(user)
+    user_role = user.role
+    context = {
+        'user': user,
+        'user_role': user_role,
+    }
     
-    # Redirect doctors to their specialized dashboard
-    if user_role == 'doctor':
-        return redirect('doctor_dashboard')
+    # Get all courses the user is enrolled in
+    user_progress_list = UserProgress.objects.filter(user=user).select_related('course').prefetch_related(
+        'materials_completed', 'tests_completed', 'lessons_completed'
+    )
     
-    # Cache key specific to this user
-    cache_key = f'dashboard_{user.id}'
-    cached_context = cache.get(cache_key)
-    
-    if cached_context:
-        return render(request, 'core/dashboard.html', cached_context)
-    
-    # For students/parents: show their enrolled courses and progress
-    if user_role == 'student' or user_role == 'parent':
-        enrolled_courses = Course.objects.filter(user_progress__user=user).select_related('author')
+    # For student and parent dashboard
+    if user_role in ['student', 'parent']:
+        enrolled_courses = []
+        completed_lessons_count = 0
+        total_lessons_count = 0
+        completed_quizzes_count = 0
+        total_quizzes_count = 0
         
-        # If user is enrolled in courses, fetch progress details
-        if enrolled_courses.exists():
-            progress_data = UserProgress.objects.filter(user=user).select_related('course').prefetch_related(
-                Prefetch('materials_completed', queryset=Material.objects.select_related('author')),
-                Prefetch('tests_completed', queryset=Test.objects.select_related('course'))
-            )
-            certificates = Certificate.objects.filter(user=user).select_related('course')
+        # Process each course enrollment
+        for progress in user_progress_list:
+            course = progress.course
             
-            context = {
-                'enrolled_courses': enrolled_courses,
-                'progress_data': progress_data,
-                'certificates': certificates,
-                'user_role': user_role,
-            }
-        else:
-            # Don't waste resources fetching progress if not enrolled
-            context = {
-                'enrolled_courses': [],
-                'user_role': user_role,
-            }
-    else:
-        # Fallback for any other role
-        context = {
-            'user_role': user_role,
-        }
+            # Calculate progress percentage
+            total_lessons = Lesson.objects.filter(module__course=course).count()
+            completed_lessons = progress.lessons_completed.count()
+            
+            if total_lessons > 0:
+                progress_percentage = (completed_lessons / total_lessons) * 100
+            else:
+                progress_percentage = 0
+                
+            # Find next lesson to continue
+            next_lesson = None
+            for module in course.modules.all().order_by('order'):
+                if not next_lesson:
+                    for lesson in module.lessons.all().order_by('order'):
+                        if lesson not in progress.lessons_completed.all():
+                            next_lesson = lesson
+                            break
+            
+            enrolled_courses.append({
+                'course': course,
+                'progress_percentage': round(progress_percentage),
+                'last_access': progress.last_access,
+                'next_lesson': next_lesson
+            })
+            
+            # Update statistics
+            completed_lessons_count += completed_lessons
+            total_lessons_count += total_lessons
+            completed_quizzes_count += progress.tests_completed.count()
+            total_quizzes_count += course.quizzes.count()
+        
+        # Get certificates
+        certificates = Certificate.objects.filter(user=user).select_related('course')
+        
+        # Calculate averages for statistics
+        completed_lessons_percentage = 0
+        if total_lessons_count > 0:
+            completed_lessons_percentage = (completed_lessons_count / total_lessons_count) * 100
+            
+        completed_quizzes_percentage = 0
+        if total_quizzes_count > 0:
+            completed_quizzes_percentage = (completed_quizzes_count / total_quizzes_count) * 100
+        
+        # Find next content to study
+        next_content = None
+        if enrolled_courses:
+            for enrollment in enrolled_courses:
+                if enrollment['next_lesson']:
+                    next_content = {
+                        'type': 'lesson',
+                        'title': enrollment['next_lesson'].title,
+                        'course': enrollment['course'],
+                        'estimated_time': enrollment['next_lesson'].estimated_time,
+                        'url': f"/lessons/{enrollment['next_lesson'].id}/"
+                    }
+                    break
+        
+        # Get suggested courses based on user's interests and enrollment history
+        suggested_courses = Course.objects.filter(is_published=True).exclude(
+            id__in=[enrollment['course'].id for enrollment in enrolled_courses]
+        )[:3]
+        
+        # Get recent activities (placeholder - implement actual activity tracking)
+        recent_activities = []
+        
+        context.update({
+            'enrolled_courses': enrolled_courses,
+            'enrolled_courses_count': len(enrolled_courses),
+            'completed_courses_count': Certificate.objects.filter(user=user).count(),
+            'certificates_count': certificates.count(),
+            'certificates': certificates[:3],  # Show only the most recent certificates
+            'completed_lessons_count': completed_lessons_count,
+            'total_lessons_count': total_lessons_count,
+            'completed_lessons_percentage': round(completed_lessons_percentage),
+            'completed_quizzes_count': completed_quizzes_count,
+            'total_quizzes_count': total_quizzes_count,
+            'completed_quizzes_percentage': round(completed_quizzes_percentage),
+            'average_quiz_score': 0,  # Placeholder - implement actual calculation
+            'next_content': next_content,
+            'suggested_courses': suggested_courses,
+            'recent_activities': recent_activities
+        })
     
-    # Cache for 5 minutes
-    cache.set(cache_key, context, 60 * 5)
+    # For doctor dashboard
+    elif user_role == 'doctor':
+        created_courses = Course.objects.filter(author=user)
+        created_materials = Material.objects.filter(author=user)
+        
+        context.update({
+            'created_courses': created_courses,
+            'created_materials': created_materials,
+        })
     
     return render(request, 'core/dashboard.html', context)
 
@@ -507,11 +581,12 @@ def course_detail(request, pk):
     # Check if the user is enrolled
     is_enrolled = False
     user_progress = None
+    next_lesson = None
     
     if request.user.is_authenticated:
         user_progress = UserProgress.objects.filter(
             user=request.user, course=course
-        ).prefetch_related('materials_completed', 'tests_completed').first()
+        ).prefetch_related('materials_completed', 'tests_completed', 'lessons_completed').first()
         is_enrolled = user_progress is not None
     
     # Import Quiz model here to avoid circular imports
@@ -527,11 +602,30 @@ def course_detail(request, pk):
         passed_attempts = QuizAttempt.objects.filter(
             user=request.user,
             quiz__in=quizzes,
-            passed=True
+            is_completed=True
         ).values_list('quiz_id', flat=True)
         
         # Mark quizzes as completed
         completed_quizzes = {quiz_id: True for quiz_id in passed_attempts}
+        
+        # Find the next lesson to continue with
+        if user_progress:
+            # Get all lessons for this course
+            from core.models import Lesson
+            all_lessons = Lesson.objects.filter(module__course=course).order_by('module__order', 'order')
+            
+            # Get the completed lessons IDs
+            completed_lesson_ids = set(user_progress.lessons_completed.values_list('id', flat=True))
+            
+            # Find the first uncompleted lesson
+            for lesson in all_lessons:
+                if lesson.id not in completed_lesson_ids:
+                    next_lesson = lesson
+                    break
+            
+            # If all lessons are completed but no next lesson is set, set it to the first lesson
+            if next_lesson is None and all_lessons.exists():
+                next_lesson = all_lessons.first()
     
     context = {
         'course': course,
@@ -540,7 +634,8 @@ def course_detail(request, pk):
         'is_enrolled': is_enrolled,
         'user_progress': user_progress,
         'user_role': user_role,
-        'completed_quizzes': completed_quizzes
+        'completed_quizzes': completed_quizzes,
+        'next_lesson': next_lesson
     }
     
     # Cache for 5 minutes
@@ -615,6 +710,67 @@ def comment_delete(request, pk):
     return redirect('home')
 
 @login_required
+def add_comment(request, material_id):
+    """
+    Add a comment to a material
+    """
+    material = get_object_or_404(Material, id=material_id)
+    
+    if request.method == 'POST':
+        text = request.POST.get('text')
+        if text:
+            Comment.objects.create(
+                material=material,
+                author=request.user,
+                text=text,
+                parent=None
+            )
+            messages.success(request, _("Комментарий добавлен."))
+        else:
+            messages.error(request, _("Текст комментария не может быть пустым."))
+    
+    return redirect('material-detail', pk=material_id)
+
+@login_required
+def add_reply(request, comment_id):
+    """
+    Add a reply to a comment
+    """
+    parent_comment = get_object_or_404(Comment, id=comment_id)
+    
+    if request.method == 'POST':
+        text = request.POST.get('text')
+        if text:
+            Comment.objects.create(
+                material=parent_comment.material,
+                author=request.user,
+                text=text,
+                parent=parent_comment
+            )
+            messages.success(request, _("Ответ добавлен."))
+        else:
+            messages.error(request, _("Текст ответа не может быть пустым."))
+    
+    return redirect('material-detail', pk=parent_comment.material.id)
+
+@login_required
+def delete_comment(request, comment_id):
+    """
+    Delete a comment
+    """
+    comment = get_object_or_404(Comment, id=comment_id)
+    
+    # Check if user is the author or has permission
+    if request.user == comment.author or request.user.is_staff:
+        material_id = comment.material.id
+        comment.delete()
+        messages.success(request, _("Комментарий удален."))
+        return redirect('material-detail', pk=material_id)
+    else:
+        messages.error(request, _("У вас нет прав для удаления этого комментария."))
+        return redirect('material-detail', pk=comment.material.id)
+
+@login_required
 def test_detail(request, pk):
     test = get_object_or_404(Test.objects.select_related('course'), pk=pk)
     user_role = get_user_role(request.user)
@@ -683,6 +839,33 @@ def profile(request):
         'user_role': user_role,
     }
     return render(request, 'core/profile.html', context)
+
+@login_required
+def course_certificate(request, course_id):
+    """
+    View for generating and displaying a course completion certificate
+    """
+    course = get_object_or_404(Course, id=course_id)
+    user = request.user
+    
+    # Check if user has completed the course
+    user_progress = get_object_or_404(UserProgress, user=user, course=course)
+    
+    if not user_progress.is_completed:
+        messages.error(request, _("Вы должны завершить курс, чтобы получить сертификат."))
+        return redirect('course-detail', pk=course_id)
+    
+    # Get or create certificate
+    certificate, created = Certificate.objects.get_or_create(
+        user=user,
+        course=course,
+        defaults={
+            'certificate_id': str(uuid.uuid4())[:8].upper(),
+            'issue_date': timezone.now()
+        }
+    )
+    
+    return redirect('certificate-detail', certificate_id=certificate.certificate_id)
 
 @login_required
 def course_enroll(request, pk):
@@ -918,3 +1101,344 @@ class MaterialDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     def test_func(self):
         material = self.get_object()
         return self.request.user.is_staff or material.author == self.request.user
+
+@login_required
+def lesson_detail(request, lesson_id):
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+    course = lesson.course
+    
+    # Check if user is enrolled in the course
+    try:
+        user_progress = UserProgress.objects.get(user=request.user, course=course)
+    except UserProgress.DoesNotExist:
+        messages.warning(request, _("Вы не записаны на этот курс. Пожалуйста, запишитесь для просмотра уроков."))
+        return redirect('course-detail', course.id)
+    
+    # Get all steps for this lesson
+    lesson_steps = list(lesson.steps.all().order_by('order'))
+    total_steps = len(lesson_steps)
+    
+    if total_steps == 0:
+        messages.warning(request, _("В данном уроке пока нет содержимого. Попробуйте позже."))
+        return redirect('course-detail', course.id)
+    
+    # Determine current step (from query parameter or user progress)
+    try:
+        current_step = int(request.GET.get('step', 1))
+        if current_step < 1:
+            current_step = 1
+        elif current_step > total_steps:
+            current_step = total_steps
+    except ValueError:
+        current_step = 1
+    
+    # Load content for current step
+    current_content = lesson_steps[current_step - 1]
+    
+    # Calculate percentage for progress bar
+    current_step_percentage = (current_step / total_steps) * 100
+    
+    # Get course progress percentage
+    total_lessons = Lesson.objects.filter(module__course=course).count()
+    completed_lessons = user_progress.lessons_completed.count()
+    
+    if total_lessons > 0:
+        course_progress = (completed_lessons / total_lessons) * 100
+    else:
+        course_progress = 0
+    
+    # Check if the user has already completed this step/lesson
+    lesson_steps_completed = user_progress.lesson_steps_completed or {}
+    
+    # Convert string keys to integers if they're stored as strings
+    if isinstance(lesson_steps_completed, dict):
+        lesson_steps_completed = {int(k) if isinstance(k, str) else k: v 
+                                 for k, v in lesson_steps_completed.items()}
+    
+    # Mark current step as viewed
+    if str(lesson.id) not in lesson_steps_completed:
+        lesson_steps_completed[str(lesson.id)] = []
+    
+    if current_step not in lesson_steps_completed.get(str(lesson.id), []):
+        lesson_steps_completed.setdefault(str(lesson.id), []).append(current_step)
+        user_progress.lesson_steps_completed = lesson_steps_completed
+        user_progress.save()
+    
+    # If all steps are completed, mark the lesson as completed
+    if total_steps == len(lesson_steps_completed.get(str(lesson.id), [])):
+        user_progress.lessons_completed.add(lesson)
+    
+    context = {
+        'lesson': lesson,
+        'lesson_steps': lesson_steps,
+        'current_step': current_step,
+        'current_content': current_content,
+        'total_steps': total_steps,
+        'current_step_percentage': current_step_percentage,
+        'course_progress': round(course_progress)
+    }
+    
+    return render(request, 'core/lesson_detail.html', context)
+
+@login_required
+@require_POST
+def mark_step_completed(request):
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
+    
+    try:
+        data = json.loads(request.body)
+        lesson_id = data.get('lesson_id')
+        step = int(data.get('step'))
+        
+        lesson = get_object_or_404(Lesson, id=lesson_id)
+        course = lesson.course
+        
+        # Get user progress
+        user_progress = get_object_or_404(UserProgress, user=request.user, course=course)
+        
+        # Update completed steps
+        lesson_steps_completed = user_progress.lesson_steps_completed or {}
+        
+        if str(lesson_id) not in lesson_steps_completed:
+            lesson_steps_completed[str(lesson_id)] = []
+        
+        if step not in lesson_steps_completed[str(lesson_id)]:
+            lesson_steps_completed[str(lesson_id)].append(step)
+        
+        user_progress.lesson_steps_completed = lesson_steps_completed
+        user_progress.save()
+        
+        # Check if all steps are completed
+        total_steps = lesson.steps.count()
+        if total_steps == len(lesson_steps_completed.get(str(lesson_id), [])):
+            user_progress.lessons_completed.add(lesson)
+            
+        return JsonResponse({'status': 'success'})
+    
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+@login_required
+def module_create(request):
+    """Create a new module for a course"""
+    if request.user.role != 'doctor' and not request.user.is_staff:
+        messages.error(request, _("У вас нет прав для создания модулей."))
+        return redirect('dashboard')
+    
+    # Get course ID from URL parameters
+    course_id = request.GET.get('course')
+    course = None
+    
+    if course_id:
+        course = get_object_or_404(Course, id=course_id)
+        # Check if user is the author of the course
+        if course.author != request.user and not request.user.is_staff:
+            messages.error(request, _("Вы не являетесь автором этого курса."))
+            return redirect('course-detail', course_id)
+    
+    if request.method == 'POST':
+        form = ModuleForm(request.POST)
+        if form.is_valid():
+            module = form.save(commit=False)
+            
+            # Set the course
+            if not module.course and course:
+                module.course = course
+            
+            # Check if user is the author of the course
+            if module.course.author != request.user and not request.user.is_staff:
+                messages.error(request, _("Вы не являетесь автором этого курса."))
+                return redirect('course-detail', module.course.id)
+            
+            # Set module order (last in course)
+            last_module = Module.objects.filter(course=module.course).order_by('-order').first()
+            if last_module:
+                module.order = last_module.order + 1
+            else:
+                module.order = 1
+            
+            module.save()
+            messages.success(request, _("Модуль успешно создан."))
+            return redirect('course-detail', module.course.id)
+    else:
+        initial = {}
+        if course:
+            initial['course'] = course
+        form = ModuleForm(initial=initial)
+    
+    context = {
+        'form': form,
+        'course': course,
+    }
+    
+    return render(request, 'core/module_form.html', context)
+
+@login_required
+def lesson_create(request):
+    """Create a new lesson for a module"""
+    if request.user.role != 'doctor' and not request.user.is_staff:
+        messages.error(request, _("У вас нет прав для создания уроков."))
+        return redirect('dashboard')
+    
+    # Get module/course ID from URL parameters
+    module_id = request.GET.get('module')
+    course_id = request.GET.get('course')
+    module = None
+    course = None
+    
+    if module_id:
+        module = get_object_or_404(Module, id=module_id)
+        course = module.course
+        # Check if user is the author of the course
+        if course.author != request.user and not request.user.is_staff:
+            messages.error(request, _("Вы не являетесь автором этого курса."))
+            return redirect('course-detail', course.id)
+    elif course_id:
+        course = get_object_or_404(Course, id=course_id)
+        # Check if user is the author of the course
+        if course.author != request.user and not request.user.is_staff:
+            messages.error(request, _("Вы не являетесь автором этого курса."))
+            return redirect('course-detail', course_id)
+    
+    if request.method == 'POST':
+        form = LessonForm(request.POST)
+        content_form = LessonContentForm(request.POST, request.FILES, prefix='content')
+        
+        if form.is_valid() and content_form.is_valid():
+            lesson = form.save(commit=False)
+            
+            # Set the module
+            if not lesson.module and module:
+                lesson.module = module
+            
+            # Check if module belongs to a course authored by user
+            if lesson.module.course.author != request.user and not request.user.is_staff:
+                messages.error(request, _("Вы не являетесь автором этого курса."))
+                return redirect('course-detail', lesson.module.course.id)
+            
+            # Set lesson order (last in module)
+            last_lesson = Lesson.objects.filter(module=lesson.module).order_by('-order').first()
+            if last_lesson:
+                lesson.order = last_lesson.order + 1
+            else:
+                lesson.order = 1
+            
+            lesson.save()
+            
+            # Create first content step
+            content = content_form.save(commit=False)
+            content.lesson = lesson
+            content.order = 1
+            content.save()
+            
+            messages.success(request, _("Урок успешно создан. Вы можете добавить больше содержимого."))
+            return redirect('lesson-detail', lesson.id)
+    else:
+        initial = {}
+        if module:
+            initial['module'] = module
+        
+        form = LessonForm(initial=initial)
+        content_form = LessonContentForm(prefix='content', initial={'title': _('Введение')})
+    
+    context = {
+        'form': form,
+        'content_form': content_form,
+        'module': module,
+        'course': course,
+    }
+    
+    return render(request, 'core/lesson_form.html', context)
+
+@login_required
+def lesson_content_create(request, lesson_id):
+    """Add a new content step to a lesson"""
+    lesson = get_object_or_404(Lesson, id=lesson_id)
+    course = lesson.module.course
+    
+    # Check permissions
+    if course.author != request.user and not request.user.is_staff:
+        messages.error(request, _("У вас нет прав для редактирования этого урока."))
+        return redirect('lesson-detail', lesson_id)
+    
+    if request.method == 'POST':
+        form = LessonContentForm(request.POST, request.FILES)
+        if form.is_valid():
+            content = form.save(commit=False)
+            content.lesson = lesson
+            
+            # Set content order (last in lesson)
+            last_content = LessonContent.objects.filter(lesson=lesson).order_by('-order').first()
+            if last_content:
+                content.order = last_content.order + 1
+            else:
+                content.order = 1
+            
+            content.save()
+            messages.success(request, _("Содержимое успешно добавлено."))
+            return redirect('lesson-detail', lesson_id)
+    else:
+        form = LessonContentForm()
+    
+    context = {
+        'form': form,
+        'lesson': lesson,
+    }
+    
+    return render(request, 'core/lesson_content_form.html', context)
+
+@login_required
+@csrf_exempt
+def update_progress(request, course_id):
+    """
+    API endpoint to update user's progress in a course
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Only POST method is allowed'}, status=405)
+    
+    try:
+        course = Course.objects.get(id=course_id)
+        user = request.user
+        
+        # Get or create user progress
+        progress, created = UserProgress.objects.get_or_create(
+            user=user,
+            course=course
+        )
+        
+        data = json.loads(request.body)
+        
+        # Update progress
+        if 'completed_items' in data:
+            progress.completed_items = data['completed_items']
+        
+        if 'last_accessed_item' in data:
+            progress.last_accessed_item = data['last_accessed_item']
+        
+        # Calculate completion percentage
+        total_items = course.total_items_count
+        if total_items > 0:
+            progress.completion_percentage = (progress.completed_items / total_items) * 100
+            
+            # Check if course is completed
+            if progress.completion_percentage >= 100:
+                progress.is_completed = True
+                progress.completed_at = timezone.now()
+        
+        progress.save()
+        
+        return JsonResponse({
+            'status': 'success',
+            'progress': {
+                'completed_items': progress.completed_items,
+                'completion_percentage': progress.completion_percentage,
+                'is_completed': progress.is_completed
+            }
+        })
+    
+    except Course.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Course not found'}, status=404)
+    
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)

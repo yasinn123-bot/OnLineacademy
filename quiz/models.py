@@ -1,132 +1,103 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
-from core.models import CustomUser, Course
+from core.models import CustomUser, Course, Module
 
 class Quiz(models.Model):
-    """
-    Quiz model for creating quizzes tied to courses or standalone
-    """
-    title = models.CharField(max_length=200)
-    description = models.TextField(blank=True, null=True)
-    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='quizzes', null=True, blank=True)
-    author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='created_quizzes')
+    """Quiz model with more interactive features than Test model"""
+    title = models.CharField(max_length=100)
+    description = models.TextField()
+    module = models.OneToOneField(Module, on_delete=models.CASCADE, related_name='quiz', null=True, blank=True)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='quizzes')
+    time_limit = models.PositiveIntegerField(default=30, help_text=_('Time limit in minutes'))
+    passing_score = models.PositiveIntegerField(default=70, help_text=_('Percentage required to pass'))
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    time_limit = models.IntegerField(help_text=_("Time limit in minutes"), default=30)
-    passing_score = models.PositiveIntegerField(default=70, help_text=_("Percentage needed to pass"))
-    is_published = models.BooleanField(default=False)
+    is_published = models.BooleanField(default=True)
     
     class Meta:
-        verbose_name = _('Тест')
-        verbose_name_plural = _('Тесты')
-        ordering = ['-created_at']
+        verbose_name = _('Quiz')
+        verbose_name_plural = _('Quizzes')
     
     def __str__(self):
         return self.title
     
     @property
-    def total_questions(self):
-        return self.questions.count()
-        
-    @property
     def total_points(self):
         return sum(question.points for question in self.questions.all())
-
-class QuestionType(models.TextChoices):
-    SINGLE_CHOICE = 'single', _('Один вариант')
-    MULTIPLE_CHOICE = 'multiple', _('Несколько вариантов')
-    TRUE_FALSE = 'true_false', _('Верно/Неверно')
-    SHORT_ANSWER = 'short_answer', _('Короткий ответ')
+    
+    @property
+    def total_questions(self):
+        return self.questions.count()
 
 class Question(models.Model):
-    """
-    Question model for quiz questions
-    """
+    """Quiz question with different question types"""
+    QUESTION_TYPES = (
+        ('single', _('Единственный выбор')),
+        ('multiple', _('Множественный выбор')),
+        ('true_false', _('Верно/Неверно')),
+        ('short_answer', _('Короткий ответ')),
+    )
+    
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='questions')
     text = models.TextField()
-    question_type = models.CharField(
-        max_length=20,
-        choices=QuestionType.choices,
-        default=QuestionType.SINGLE_CHOICE
-    )
+    question_type = models.CharField(max_length=20, choices=QUESTION_TYPES, default='single')
     points = models.PositiveIntegerField(default=1)
-    explanation = models.TextField(blank=True, null=True, help_text=_("Explanation shown after answering"))
-    image = models.ImageField(upload_to='quiz_images/', blank=True, null=True)
+    explanation = models.TextField(blank=True, help_text=_('Объяснение правильного ответа'))
+    image = models.ImageField(upload_to='question_images/', null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
     
     class Meta:
-        verbose_name = _('Вопрос')
-        verbose_name_plural = _('Вопросы')
-        ordering = ['order']
+        ordering = ['order', 'id']
     
     def __str__(self):
         return self.text[:50]
 
 class Choice(models.Model):
-    """
-    Choice model for question choices/options
-    """
+    """Answer choice for a question"""
     question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='choices')
-    text = models.CharField(max_length=255)
+    text = models.TextField()
     is_correct = models.BooleanField(default=False)
-    
-    class Meta:
-        verbose_name = _('Вариант ответа')
-        verbose_name_plural = _('Варианты ответов')
+    explanation = models.TextField(blank=True)
     
     def __str__(self):
-        return self.text
+        return self.text[:50]
 
 class QuizAttempt(models.Model):
-    """
-    Quiz attempt tracking
-    """
+    """Record of a student's attempt at a quiz"""
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='attempts')
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='quiz_attempts')
-    started_at = models.DateTimeField(auto_now_add=True)
-    completed_at = models.DateTimeField(null=True, blank=True)
+    start_time = models.DateTimeField(auto_now_add=True)
+    end_time = models.DateTimeField(null=True, blank=True)
     score = models.FloatField(null=True, blank=True)
-    passed = models.BooleanField(default=False)
-    
-    class Meta:
-        verbose_name = _('Попытка теста')
-        verbose_name_plural = _('Попытки тестов')
-        ordering = ['-started_at']
+    is_completed = models.BooleanField(default=False)
     
     def __str__(self):
-        return f"{self.user.username} - {self.quiz.title}"
+        return f"{self.user.username}'s attempt at {self.quiz.title}"
     
     @property
-    def is_completed(self):
-        return self.completed_at is not None
+    def time_taken(self):
+        if self.end_time and self.start_time:
+            return (self.end_time - self.start_time).total_seconds() / 60
+        return None
     
     @property
     def score_percentage(self):
-        if not self.score or not self.quiz.total_points:
-            return 0
-        return round((self.score / self.quiz.total_points) * 100)
+        if self.score is not None and self.quiz.total_points > 0:
+            return (self.score / self.quiz.total_points) * 100
+        return 0
+    
+    @property
+    def is_passed(self):
+        return self.score_percentage >= self.quiz.passing_score if self.is_completed else False
 
-class Answer(models.Model):
-    """
-    User answers to questions
-    """
+class StudentAnswer(models.Model):
+    """Student's answer to a question"""
     attempt = models.ForeignKey(QuizAttempt, on_delete=models.CASCADE, related_name='answers')
-    question = models.ForeignKey(Question, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    # For single/multiple choice questions
-    selected_choices = models.ManyToManyField(Choice, blank=True)
-    
-    # For short answer questions
-    text_answer = models.CharField(max_length=255, blank=True, null=True)
-    
-    # Scoring
+    question = models.ForeignKey(Question, on_delete=models.CASCADE, related_name='student_answers')
+    choices = models.ManyToManyField(Choice, blank=True, related_name='selected_by')
+    text_answer = models.TextField(blank=True, null=True)
     is_correct = models.BooleanField(default=False)
     points_earned = models.FloatField(default=0)
     
-    class Meta:
-        verbose_name = _('Ответ')
-        verbose_name_plural = _('Ответы')
-    
     def __str__(self):
-        return f"Answer to {self.question}"
+        return f"Answer to {self.question} by {self.attempt.user.username}"

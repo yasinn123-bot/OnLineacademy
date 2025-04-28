@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Quiz, Question, Choice, QuizAttempt, Answer
+from .models import Quiz, Question, Choice, QuizAttempt, StudentAnswer
 
 class ChoiceSerializer(serializers.ModelSerializer):
     class Meta:
@@ -128,12 +128,12 @@ class QuizCreateUpdateSerializer(serializers.ModelSerializer):
         
         return instance
 
-class AnswerSerializer(serializers.ModelSerializer):
+class StudentAnswerSerializer(serializers.ModelSerializer):
     question_text = serializers.SerializerMethodField()
     selected_choice_texts = serializers.SerializerMethodField()
     
     class Meta:
-        model = Answer
+        model = StudentAnswer
         fields = ['id', 'question', 'question_text', 'selected_choices', 'selected_choice_texts', 
                  'text_answer', 'is_correct', 'points_earned', 'created_at']
     
@@ -162,7 +162,7 @@ class QuizAttemptListSerializer(serializers.ModelSerializer):
 class QuizAttemptDetailSerializer(serializers.ModelSerializer):
     quiz_title = serializers.SerializerMethodField()
     user_name = serializers.SerializerMethodField()
-    answers = AnswerSerializer(many=True, read_only=True)
+    answers = StudentAnswerSerializer(many=True, read_only=True)
     score_percentage = serializers.IntegerField(read_only=True)
     
     class Meta:

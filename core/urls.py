@@ -40,6 +40,7 @@ urlpatterns = [
     path('courses/<int:pk>/update/', views.CourseUpdateView.as_view(), name='course-update'),
     path('courses/<int:pk>/delete/', views.CourseDeleteView.as_view(), name='course-delete'),
     path('courses/<int:pk>/enroll/', views.course_enroll, name='course-enroll'),
+    path('courses/<int:course_id>/certificate/', views.course_certificate, name='course-certificate'),
     
     # Material URLs
     path('materials/', views.MaterialListView.as_view(), name='material-list'),
@@ -52,4 +53,20 @@ urlpatterns = [
     path('tests/<int:pk>/', views.test_detail, name='test-detail'),
     path('certificates/', views.certificate_list, name='certificate-list'),
     path('certificates/<str:certificate_id>/', views.certificate_detail, name='certificate-detail'),
+    
+    # Lessons
+    path('lessons/<int:lesson_id>/', views.lesson_detail, name='lesson-detail'),
+    path('lessons/create/', views.lesson_create, name='lesson-create'),
+    path('mark-step-completed/', views.mark_step_completed, name='mark_step_completed'),
+    
+    # Modules 
+    path('modules/create/', views.module_create, name='module-create'),
+    
+    # Comments
+    path('materials/<int:material_id>/comment/', views.add_comment, name='add-comment'),
+    path('comments/<int:comment_id>/reply/', views.add_reply, name='add-reply'),
+    path('comments/<int:comment_id>/delete/', views.delete_comment, name='delete-comment'),
+    
+    # API
+    path('api/course-progress/<int:course_id>/', views.update_progress, name='update-progress'),
 ] 

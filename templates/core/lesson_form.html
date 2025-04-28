@@ -1,0 +1,294 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{% if form.instance.id %}{% trans "Редактирование урока" %}{% else %}{% trans "Создание урока" %}{% endif %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'course-list' %}">{% trans "Курсы" %}</a></li>
+                    {% if course %}
+                    <li class="breadcrumb-item"><a href="{% url 'course-detail' course.id %}">{{ course.title }}</a></li>
+                    {% endif %}
+                    {% if module %}
+                    <li class="breadcrumb-item">{{ module.title }}</li>
+                    {% endif %}
+                    <li class="breadcrumb-item active" aria-current="page">
+                        {% if form.instance.id %}{% trans "Редактирование урока" %}{% else %}{% trans "Создание урока" %}{% endif %}
+                    </li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        {% if form.instance.id %}
+                            {% trans "Редактирование урока" %}
+                        {% else %}
+                            {% trans "Создание нового урока" %}
+                        {% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        
+                        <div class="row mb-4">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="{{ form.title.id_for_label }}" class="form-label">
+                                        {% trans "Название урока" %} <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.title }}
+                                    {% if form.title.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.title.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        {% trans "Информативное название, которое четко определяет тему урока" %}
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="{{ form.description.id_for_label }}" class="form-label">
+                                        {% trans "Описание" %}
+                                    </label>
+                                    {{ form.description }}
+                                    {% if form.description.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.description.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        {% trans "Краткое описание того, чему научатся пользователи в этом уроке" %}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="{{ form.module.id_for_label }}" class="form-label">
+                                        {% trans "Модуль" %} <span class="text-danger">*</span>
+                                    </label>
+                                    {{ form.module }}
+                                    {% if form.module.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.module.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        {% trans "Выберите модуль, к которому будет относиться урок" %}
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="{{ form.estimated_time.id_for_label }}" class="form-label">
+                                        {% trans "Приблизительное время" %} <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        {{ form.estimated_time }}
+                                        <span class="input-group-text">{% trans "мин." %}</span>
+                                    </div>
+                                    {% if form.estimated_time.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.estimated_time.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <div class="form-text">
+                                        {% trans "Приблизительное время, необходимое для прохождения урока" %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <h5 class="mb-3">{% trans "Первый шаг урока" %}</h5>
+                        <p class="text-muted mb-4">{% trans "Добавьте первый шаг урока. После создания урока вы сможете добавить дополнительные шаги." %}</p>
+                        
+                        <div class="mb-4">
+                            <label for="{{ content_form.title.id_for_label }}" class="form-label">
+                                {% trans "Заголовок" %} <span class="text-danger">*</span>
+                            </label>
+                            {{ content_form.title }}
+                            {% if content_form.title.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in content_form.title.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="{{ content_form.content.id_for_label }}" class="form-label">
+                                {% trans "Содержание" %} <span class="text-danger">*</span>
+                            </label>
+                            {{ content_form.content }}
+                            {% if content_form.content.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in content_form.content.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-4">
+                                <label for="{{ content_form.image.id_for_label }}" class="form-label">
+                                    {% trans "Изображение" %}
+                                </label>
+                                {{ content_form.image }}
+                                {% if content_form.image.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in content_form.image.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">
+                                    {% trans "Необязательное изображение для этого шага" %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-4">
+                                <label for="{{ content_form.code_snippet.id_for_label }}" class="form-label">
+                                    {% trans "Код" %}
+                                </label>
+                                {{ content_form.code_snippet }}
+                                {% if content_form.code_snippet.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {% for error in content_form.code_snippet.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                <div class="form-text">
+                                    {% trans "Необязательный фрагмент кода для примера" %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info mt-4">
+                            <div class="d-flex">
+                                <div class="me-3">
+                                    <i class="fas fa-info-circle fa-2x"></i>
+                                </div>
+                                <div>
+                                    <h5 class="alert-heading">{% trans "Рекомендации по созданию эффективных уроков" %}</h5>
+                                    <p class="mb-1">{% trans "Следующие практики помогут создать качественный учебный материал:" %}</p>
+                                    <ul class="mb-0">
+                                        <li>{% trans "Разделите материал на небольшие логические шаги" %}</li>
+                                        <li>{% trans "Используйте простой и понятный язык" %}</li>
+                                        <li>{% trans "Добавляйте иллюстрации и примеры, где это возможно" %}</li>
+                                        <li>{% trans "Проверяйте понимание через вопросы и задания" %}</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            {% if module %}
+                                <a href="{% url 'course-detail' module.course.id %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-1"></i> {% trans "Назад к курсу" %}
+                                </a>
+                            {% elif course %}
+                                <a href="{% url 'course-detail' course.id %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-1"></i> {% trans "Назад к курсу" %}
+                                </a>
+                            {% else %}
+                                <a href="{% url 'course-list' %}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-1"></i> {% trans "Назад к курсам" %}
+                                </a>
+                            {% endif %}
+                            
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>
+                                {% if form.instance.id %}
+                                    {% trans "Сохранить изменения" %}
+                                {% else %}
+                                    {% trans "Создать урок" %}
+                                {% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .tox-tinymce {
+        border-radius: 0.25rem;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.tiny.cloud/1/no-api-key/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Apply Bootstrap classes to form elements
+        const formElements = document.querySelectorAll('form input[type=text], form input[type=number], form textarea:not(.rich-text-editor), form select, form input[type=file]');
+        formElements.forEach(function(element) {
+            if (!element.classList.contains('form-control') && !element.classList.contains('form-select')) {
+                if (element.tagName === 'SELECT') {
+                    element.classList.add('form-select');
+                } else if (element.getAttribute('type') === 'file') {
+                    element.classList.add('form-control');
+                } else {
+                    element.classList.add('form-control');
+                }
+            }
+        });
+        
+        // Initialize TinyMCE
+        tinymce.init({
+            selector: 'textarea.rich-text-editor',
+            plugins: 'autolink lists link image charmap print preview anchor searchreplace visualblocks code fullscreen insertdatetime media table paste code help wordcount',
+            toolbar: 'undo redo | formatselect | bold italic backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | removeformat | help',
+            height: 300,
+            setup: function (editor) {
+                editor.on('change', function () {
+                    editor.save();
+                });
+            }
+        });
+        
+        // Add highlighting to code editor
+        const codeEditor = document.querySelector('textarea.code-editor');
+        if (codeEditor) {
+            codeEditor.style.fontFamily = 'monospace';
+        }
+    });
+</script>
+{% endblock %} 
