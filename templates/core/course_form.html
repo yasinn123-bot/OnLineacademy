@@ -1,1 +1,147 @@
- 
+{% extends 'core/base.html' %}
+{% load i18n %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}
+        {% trans "Редактирование курса" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}
+    {% else %}
+        {% trans "Создание курса" %} | {% trans "Онлайн-академия детской онкологии и онкогематологии" %}
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">{% trans "Панель управления" %}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'course-list' %}">{% trans "Курсы" %}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">
+                        {% if form.instance.pk %}
+                            {% trans "Редактирование курса" %}
+                        {% else %}
+                            {% trans "Создание курса" %}
+                        {% endif %}
+                    </li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 col-md-10 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        {% if form.instance.pk %}
+                            {% trans "Редактирование курса" %}
+                        {% else %}
+                            {% trans "Создание нового курса" %}
+                        {% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                {{ form.title|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                {{ form.description|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.language|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.is_published|as_crispy_field }}
+                            </div>
+                        </div>
+                        
+                        {% if form.time_limit %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.time_limit|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.passing_score|as_crispy_field }}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a href="{% url 'course-list' %}" class="btn btn-outline-secondary">
+                                {% trans "Отмена" %}
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                {% if form.instance.pk %}
+                                    {% trans "Сохранить изменения" %}
+                                {% else %}
+                                    {% trans "Создать курс" %}
+                                {% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                {% if form.instance.pk %}
+                <div class="card-footer bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            {% trans "Дата создания" %}: {{ form.instance.created_at|date:"d.m.Y" }}
+                        </small>
+                        <a href="{% url 'course-delete' form.instance.pk %}" class="btn btn-sm btn-outline-danger">
+                            <i class="fas fa-trash me-1"></i>{% trans "Удалить курс" %}
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            {% if form.instance.pk %}
+            <div class="card shadow mt-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">{% trans "Что дальше?" %}</h5>
+                </div>
+                <div class="card-body">
+                    <p>{% trans "Теперь вы можете наполнить ваш курс содержимым:" %}</p>
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <a href="{% url 'module-create' %}?course={{ form.instance.pk }}" class="btn btn-outline-success w-100">
+                                <i class="fas fa-folder-plus me-2"></i>{% trans "Добавить модуль" %}
+                            </a>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <a href="{% url 'lesson-create' %}?course={{ form.instance.pk }}" class="btn btn-outline-info w-100">
+                                <i class="fas fa-file-alt me-2"></i>{% trans "Добавить урок" %}
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Add any additional JavaScript functionality here
+        const titleField = document.querySelector('#id_title');
+        if (titleField) {
+            titleField.focus();
+        }
+    });
+</script>
+{% endblock %} 

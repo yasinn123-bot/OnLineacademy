@@ -43,6 +43,9 @@
                                     {% if user.is_staff %}
                                         <li><a class="dropdown-item text-dark" href="{% url 'admin:index' %}">{% trans "Админ-панель" %}</a></li>
                                     {% endif %}
+                                    {% if user_role == 'doctor' %}
+                                        <li><a class="dropdown-item text-dark" href="{% url 'doctor_dashboard' %}">{% trans "Кабинет врача" %}</a></li>
+                                    {% endif %}
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
                                         <form method="post" action="{% url 'logout' %}">
@@ -96,9 +99,11 @@
                                         {% trans "Управление контентом" %}
                                     </a>
                                     <ul class="dropdown-menu" aria-labelledby="materialsDropdown">
+                                        <li><a class="dropdown-item text-dark" href="{% url 'course-create' %}">{% trans "Создать курс" %}</a></li>
                                         <li><a class="dropdown-item text-dark" href="{% url 'material-create' %}">{% trans "Добавить материал" %}</a></li>
                                         <li><a class="dropdown-item text-dark" href="{% url 'quiz:create_quiz' %}">{% trans "Создать тест" %}</a></li>
                                         <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item text-dark" href="{% url 'doctor_dashboard' %}">{% trans "Кабинет врача" %}</a></li>
                                         <li><a class="dropdown-item text-dark" href="{% url 'quiz:quiz_list' %}">{% trans "Все тесты" %}</a></li>
                                     </ul>
                                 </li>

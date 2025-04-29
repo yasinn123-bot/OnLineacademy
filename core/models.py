@@ -81,14 +81,47 @@ class Module(models.Model):
     @property
     def progress_percentage(self):
         """Calculate completion percentage for this module"""
-        # Logic to be implemented based on UserProgress
+        from django.db.models import Count
+        
+        # Get total lessons in this module
+        total_lessons = self.lessons.count()
+        if total_lessons == 0:
+            return 0
+            
+        # This is calculated per user in the view
+        # This property is only used as a read-only property
         return 0
     
     @property
     def completed(self):
         """Check if all lessons and quiz in this module are completed"""
-        # Logic to be implemented based on UserProgress
+        # This is calculated per user in the view
+        # This property is only used as a read-only property
         return False
+
+    def get_progress_for_user(self, user):
+        """Get progress percentage for a specific user"""
+        # Get user progress for the course
+        from .models import UserProgress
+        
+        try:
+            user_progress = UserProgress.objects.get(user=user, course=self.course)
+            # Count total and completed lessons
+            total_lessons = self.lessons.count()
+            if total_lessons == 0:
+                return 0, False
+                
+            completed_lessons = user_progress.lessons_completed.filter(module=self).count()
+            progress_percentage = (completed_lessons / total_lessons) * 100
+            is_completed = (completed_lessons == total_lessons)
+            
+            # Check if module has a quiz and it's completed
+            if hasattr(self, 'quiz') and self.quiz:
+                is_completed = is_completed and (self.quiz in user_progress.tests_completed.all())
+            
+            return round(progress_percentage), is_completed
+        except UserProgress.DoesNotExist:
+            return 0, False
 
 
 class Lesson(models.Model):
@@ -117,6 +150,18 @@ class Lesson(models.Model):
         """Check if this is the current lesson for the user to study"""
         # Logic to be implemented
         return False
+
+    def is_finished(self, user):
+        """Check if the specified user has completed this lesson"""
+        from .models import UserProgress
+        try:
+            # Get user progress for this course
+            progress = UserProgress.objects.get(user=user, course=self.course)
+            
+            # Check if this lesson is in completed_lessons
+            return self in progress.lessons_completed.all()
+        except UserProgress.DoesNotExist:
+            return False
 
 
 class LessonContent(models.Model):

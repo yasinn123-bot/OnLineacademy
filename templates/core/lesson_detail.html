@@ -83,18 +83,18 @@
                         {% endif %}
                         
                         {% if current_step < total_steps %}
-                        <a href="{% url 'lesson-detail' lesson.id %}?step={{ current_step|add:'1' }}" class="btn btn-primary" id="next-step-btn">
+                        <a href="{% url 'lesson-detail' lesson.id %}?step={{ current_step|add:'1' }}" class="btn btn-primary" id="next-step-btn" data-mark-completed="true">
                             {% trans "Далее" %} <i class="fas fa-arrow-right ms-2"></i>
                         </a>
                         {% else %}
                         {% if lesson.quiz %}
-                        <a href="{% url 'quiz:quiz_detail' lesson.quiz.id %}" class="btn btn-success">
+                        <a href="{% url 'quiz:quiz_detail' lesson.quiz.id %}" class="btn btn-success" id="complete-lesson-btn" data-mark-completed="true">
                             <i class="fas fa-question-circle me-2"></i>{% trans "Перейти к тесту" %}
                         </a>
                         {% else %}
-                        <a href="{% url 'course-detail' lesson.course.id %}" class="btn btn-success">
+                        <button id="complete-lesson-btn" class="btn btn-success" data-mark-completed="true" data-next-lesson-url="{{ next_lesson_url }}" data-bs-toggle="modal" data-bs-target="#lessonCompletedModal">
                             <i class="fas fa-check-circle me-2"></i>{% trans "Завершить урок" %}
-                        </a>
+                        </button>
                         {% endif %}
                         {% endif %}
                     </div>
@@ -114,12 +114,12 @@
                         <a href="{% url 'lesson-detail' lesson.id %}?step={{ forloop.counter }}" 
                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center
                                   {% if forloop.counter == current_step %}active{% endif %}
-                                  {% if forloop.counter < current_step %}completed{% endif %}">
+                                  {% if forloop.counter in completed_steps %}completed{% endif %}">
                             <div>
                                 <span class="step-number me-2">{{ forloop.counter }}</span>
                                 <span class="step-title">{{ step.title|truncatechars:30 }}</span>
                             </div>
-                            {% if forloop.counter < current_step %}
+                            {% if forloop.counter in completed_steps and forloop.counter != current_step %}
                             <i class="fas fa-check-circle text-success"></i>
                             {% elif forloop.counter == current_step %}
                             <i class="fas fa-circle text-primary"></i>
@@ -172,6 +172,43 @@
                         </a>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lesson Completed Modal -->
+<div class="modal fade" id="lessonCompletedModal" tabindex="-1" aria-labelledby="lessonCompletedModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="lessonCompletedModalLabel">
+                    <i class="fas fa-check-circle me-2"></i>{% trans "Урок завершен" %}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div class="display-1 text-success mb-4">
+                    <i class="fas fa-award"></i>
+                </div>
+                <h4>{% trans "Поздравляем!" %}</h4>
+                <p class="mb-4">{% trans "Вы успешно завершили урок" %} <strong>{{ lesson.title }}</strong></p>
+                
+                {% if next_lesson_url %}
+                <p>{% trans "Хотите перейти к следующему уроку?" %}</p>
+                {% else %}
+                <p>{% trans "Вы можете вернуться к обзору курса." %}</p>
+                {% endif %}
+            </div>
+            <div class="modal-footer justify-content-center">
+                <a href="{% url 'course-detail' lesson.course.id %}" class="btn btn-outline-secondary">
+                    <i class="fas fa-th-list me-2"></i>{% trans "К списку уроков" %}
+                </a>
+                {% if next_lesson_url %}
+                <a href="{{ next_lesson_url }}" class="btn btn-success" id="goToNextLessonBtn">
+                    <i class="fas fa-arrow-right me-2"></i>{% trans "Следующий урок" %}
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -271,26 +308,142 @@
         });
         
         // Mark step as completed when navigating away
-        const nextButton = document.getElementById('next-step-btn');
-        if (nextButton) {
-            nextButton.addEventListener('click', function(e) {
-                // You can add AJAX call here to mark the step as completed
-                // For example:
-                /*
-                fetch('{% url "mark_step_completed" %}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    },
-                    body: JSON.stringify({
-                        lesson_id: '{{ lesson.id }}',
-                        step: '{{ current_step }}'
+        const buttonsToTrack = document.querySelectorAll('[data-mark-completed="true"]');
+        
+        buttonsToTrack.forEach(button => {
+            button.addEventListener('click', function(e) {
+                // For non-completion buttons (Next button), navigate immediately and save progress in background
+                if (this.id !== 'complete-lesson-btn') {
+                    // Store the default action URL before preventing default
+                    const targetUrl = this.href;
+                    
+                    // Prevent the default navigation temporarily
+                    e.preventDefault();
+                    
+                    // Show a subtle indicator that we're working
+                    this.classList.add('disabled');
+                    const originalText = this.innerHTML;
+                    this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>' + originalText.replace(/<i.*?<\/i>/, '');
+                    
+                    // Send the progress update in the background
+                    fetch('{% url "mark_step_completed" %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({
+                            lesson_id: '{{ lesson.id }}',
+                            step: {{ current_step }}
+                        })
                     })
-                });
-                */
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Step progress saved:', data);
+                    })
+                    .catch(error => {
+                        console.error('Error saving step progress:', error);
+                    })
+                    .finally(() => {
+                        // Continue with navigation after a very brief delay to ensure the request is sent
+                        setTimeout(() => {
+                            window.location.href = targetUrl;
+                        }, 300);
+                    });
+                    
+                    return false;
+                }
+                
+                // For the completion button at the last step
+                if (!this.hasAttribute('data-bs-toggle')) {
+                    e.preventDefault();
+                    
+                    // Show loading indicator
+                    this.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>{% trans "Перенаправление..." %}';
+                    this.disabled = true;
+                    
+                    // Send request to mark step completed and get next step info
+                    fetch('{% url "mark_step_completed" %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({
+                            lesson_id: '{{ lesson.id }}',
+                            step: {{ current_step }}
+                        })
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok: ' + response.statusText);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Progress updated', data);
+                        
+                        // If there's debug info, log it
+                        if (data.debug_info) {
+                            console.log('Debug info:', data.debug_info);
+                        }
+                        
+                        setTimeout(() => {
+                            // If module is completed and has a quiz, redirect to the quiz
+                            if (data.module_completed && data.has_quiz && data.quiz_url) {
+                                console.log('Module completed! Redirecting to quiz:', data.quiz_url);
+                                window.location.href = data.quiz_url;
+                            } 
+                            // Otherwise use the next lesson URL
+                            else if (data.next_lesson_url) {
+                                console.log('Lesson completed! Redirecting to next lesson:', data.next_lesson_url);
+                                window.location.href = data.next_lesson_url;
+                            } else {
+                                // Fall back to course detail if no next lesson
+                                console.log('No next lesson. Redirecting to course page.');
+                                window.location.href = '{% url "course-detail" lesson.course.id %}';
+                            }
+                        }, 500); // Short delay to ensure server has time to process
+                    })
+                    .catch(error => {
+                        console.error('Error updating progress:', error);
+                        // Fall back to original navigation if there's an error
+                        alert('There was an error updating your progress. Please try again.');
+                        this.disabled = false;
+                        this.innerHTML = '<i class="fas fa-check-circle me-2"></i>{% trans "Завершить урок" %}';
+                    });
+                } else {
+                    // For modal button, still send the request to update progress
+                    fetch('{% url "mark_step_completed" %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({
+                            lesson_id: '{{ lesson.id }}',
+                            step: {{ current_step }}
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update the "Next Lesson" button in the modal if there's a next lesson
+                        if (data.next_lesson_url) {
+                            const goToNextBtn = document.getElementById('goToNextLessonBtn');
+                            if (goToNextBtn) {
+                                goToNextBtn.href = data.next_lesson_url;
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error marking step as completed:', error);
+                    });
+                }
             });
-        }
+        });
     });
 </script>
 {% endblock %} 

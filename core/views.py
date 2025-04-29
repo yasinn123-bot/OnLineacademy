@@ -8,8 +8,8 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.translation import gettext as _
 from django.conf import settings
-from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.urls import reverse_lazy, reverse
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView, TemplateView
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
 import uuid
@@ -567,6 +567,16 @@ def course_list(request):
     }
     return render(request, 'core/course_list.html', context)
 
+# Add this class definition before the course_detail function
+class ModuleWithProgress:
+    """Helper class to store module data with progress information"""
+    def __init__(self, module, progress_percentage=0, completed=False):
+        self.module = module
+        self.progress_percentage = progress_percentage
+        self.completed = completed
+        self.quiz = None
+        self.quiz_completed = False
+
 def course_detail(request, pk):
     # Try to get from cache first
     cache_key = f'course_detail_{pk}_{request.user.id if request.user.is_authenticated else 0}'
@@ -582,6 +592,7 @@ def course_detail(request, pk):
     is_enrolled = False
     user_progress = None
     next_lesson = None
+    progress_percentage = 0
     
     if request.user.is_authenticated:
         user_progress = UserProgress.objects.filter(
@@ -592,8 +603,17 @@ def course_detail(request, pk):
     # Import Quiz model here to avoid circular imports
     from quiz.models import Quiz, QuizAttempt
     
-    # Get quizzes for this course
-    quizzes = Quiz.objects.filter(course=course).prefetch_related('questions')
+    # Get modules with their related quizzes for efficient loading
+    course_modules = list(course.modules.prefetch_related('quiz').all().order_by('order'))
+    
+    # Get quizzes for this course with prefetch related for better performance
+    quizzes = Quiz.objects.filter(course=course).select_related('module').prefetch_related('questions')
+    
+    # Create a dictionary mapping module IDs to quizzes for efficient access
+    module_quizzes = {}
+    for quiz in quizzes:
+        if quiz.module_id:
+            module_quizzes[quiz.module_id] = quiz
     
     # Check for completed quizzes
     completed_quizzes = {}
@@ -617,16 +637,93 @@ def course_detail(request, pk):
             # Get the completed lessons IDs
             completed_lesson_ids = set(user_progress.lessons_completed.values_list('id', flat=True))
             
+            # Calculate progress percentage
+            total_lessons = all_lessons.count()
+            completed_lessons_count = len(completed_lesson_ids)
+            
+            if total_lessons > 0:
+                progress_percentage = (completed_lessons_count / total_lessons) * 100
+            
             # Find the first uncompleted lesson
             for lesson in all_lessons:
                 if lesson.id not in completed_lesson_ids:
                     next_lesson = lesson
                     break
             
-            # If all lessons are completed but no next lesson is set, set it to the first lesson
-            if next_lesson is None and all_lessons.exists():
-                next_lesson = all_lessons.first()
+            # If all lessons are completed but no next lesson is set, look for uncompleted quizzes
+            if next_lesson is None:
+                for quiz in quizzes:
+                    if quiz.id not in passed_attempts:
+                        if quiz.module_id:
+                            # Check if all lessons in this module are completed
+                            module_lessons = Lesson.objects.filter(module=quiz.module)
+                            module_lesson_ids = set(module_lessons.values_list('id', flat=True))
+                            if module_lesson_ids.issubset(completed_lesson_ids):
+                                # All lessons in this module are completed, suggest the quiz
+                                return redirect('quiz:quiz_detail', quiz.id)
+                
+                # If still no next content and all lessons exists, set to first lesson
+                if next_lesson is None and all_lessons.exists():
+                    next_lesson = all_lessons.first()
     
+    # Calculate module progress information
+    modules_with_progress = []
+    if course_modules:
+        for module in course_modules:
+            # Use the new method to get progress for this user
+            if is_enrolled and request.user.is_authenticated:
+                progress_percentage, is_completed = module.get_progress_for_user(request.user)
+                
+                # Create a ModuleWithProgress object with the calculated values
+                module_with_progress = ModuleWithProgress(
+                    module=module,
+                    progress_percentage=progress_percentage,
+                    completed=is_completed
+                )
+                
+                # Mark lessons as finished or not for this user
+                if module_with_progress.module.lessons.exists():
+                    # Create a list of lessons with their completion status
+                    module_with_progress.lessons_with_status = []
+                    for lesson in module_with_progress.module.lessons.all().order_by('order'):
+                        is_finished = lesson.is_finished(request.user)
+                        module_with_progress.lessons_with_status.append({
+                            'lesson': lesson,
+                            'is_finished': is_finished
+                        })
+            else:
+                # If user is not enrolled, create with default values
+                module_with_progress = ModuleWithProgress(
+                    module=module,
+                    progress_percentage=0,
+                    completed=False
+                )
+                
+                # Mark all lessons as not finished
+                if module_with_progress.module.lessons.exists():
+                    module_with_progress.lessons_with_status = []
+                    for lesson in module_with_progress.module.lessons.all().order_by('order'):
+                        module_with_progress.lessons_with_status.append({
+                            'lesson': lesson,
+                            'is_finished': False
+                        })
+            
+            # Get the quiz for this module (if any)
+            try:
+                if hasattr(module, 'quiz') and module.quiz:
+                    module_with_progress.quiz = module.quiz
+                    if is_enrolled and module.quiz.id in completed_quizzes:
+                        module_with_progress.quiz_completed = True
+            except:
+                # If there's an issue with the quiz relationship, use the dictionary
+                if module.id in module_quizzes:
+                    module_with_progress.quiz = module_quizzes[module.id]
+                    if is_enrolled and module_with_progress.quiz.id in completed_quizzes:
+                        module_with_progress.quiz_completed = True
+            
+            modules_with_progress.append(module_with_progress)
+    
+    # Build context with all the data
     context = {
         'course': course,
         'materials': Material.objects.filter(course=course).select_related('author'),
@@ -635,8 +732,35 @@ def course_detail(request, pk):
         'user_progress': user_progress,
         'user_role': user_role,
         'completed_quizzes': completed_quizzes,
-        'next_lesson': next_lesson
+        'next_lesson': next_lesson,
+        'progress_percentage': round(progress_percentage) if progress_percentage is not None else 0,
+        'modules': modules_with_progress,
     }
+    
+    # Check if user has a certificate for this course
+    context['course_completed'] = False
+    context['user_has_certificate'] = False
+    context['user_certificate'] = None
+    
+    if is_enrolled and request.user.is_authenticated:
+        # Check if all lessons are completed
+        all_lessons = Lesson.objects.filter(module__course=course)
+        total_lessons = all_lessons.count()
+        completed_lessons = user_progress.lessons_completed.count()
+        
+        if total_lessons > 0 and completed_lessons >= total_lessons:
+            context['course_completed'] = True
+            
+            # Check for certificate
+            certificate = Certificate.objects.filter(user=request.user, course=course).first()
+            if certificate:
+                context['user_has_certificate'] = True
+                context['user_certificate'] = certificate
+    
+    # Add related courses
+    context['related_courses'] = Course.objects.filter(
+        is_published=True
+    ).exclude(id=course.id).order_by('?')[:3]
     
     # Cache for 5 minutes
     cache.set(cache_key, context, 60 * 5)
@@ -1104,17 +1228,24 @@ class MaterialDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 
 @login_required
 def lesson_detail(request, lesson_id):
-    lesson = get_object_or_404(Lesson, id=lesson_id)
+    # Use select_related to reduce queries
+    lesson = get_object_or_404(
+        Lesson.objects.select_related('module', 'module__course', 'quiz')
+                     .prefetch_related('additional_resources'),
+        id=lesson_id
+    )
     course = lesson.course
     
     # Check if user is enrolled in the course
     try:
-        user_progress = UserProgress.objects.get(user=request.user, course=course)
+        user_progress = UserProgress.objects.prefetch_related(
+            'lessons_completed', 'tests_completed'
+        ).get(user=request.user, course=course)
     except UserProgress.DoesNotExist:
         messages.warning(request, _("Вы не записаны на этот курс. Пожалуйста, запишитесь для просмотра уроков."))
         return redirect('course-detail', course.id)
     
-    # Get all steps for this lesson
+    # Get all steps for this lesson with prefetch_related for images
     lesson_steps = list(lesson.steps.all().order_by('order'))
     total_steps = len(lesson_steps)
     
@@ -1138,8 +1269,13 @@ def lesson_detail(request, lesson_id):
     # Calculate percentage for progress bar
     current_step_percentage = (current_step / total_steps) * 100
     
-    # Get course progress percentage
-    total_lessons = Lesson.objects.filter(module__course=course).count()
+    # Get course progress percentage - use one query instead of two
+    from django.db.models import Count
+    
+    course_stats = Lesson.objects.filter(module__course=course).aggregate(
+        total_lessons=Count('id')
+    )
+    total_lessons = course_stats['total_lessons']
     completed_lessons = user_progress.lessons_completed.count()
     
     if total_lessons > 0:
@@ -1149,24 +1285,71 @@ def lesson_detail(request, lesson_id):
     
     # Check if the user has already completed this step/lesson
     lesson_steps_completed = user_progress.lesson_steps_completed or {}
+    str_lesson_id = str(lesson.id)  # Use string key for JSON
     
-    # Convert string keys to integers if they're stored as strings
-    if isinstance(lesson_steps_completed, dict):
-        lesson_steps_completed = {int(k) if isinstance(k, str) else k: v 
-                                 for k, v in lesson_steps_completed.items()}
+    # Ensure the dict format is consistent
+    if not isinstance(lesson_steps_completed, dict):
+        lesson_steps_completed = {}
     
-    # Mark current step as viewed
-    if str(lesson.id) not in lesson_steps_completed:
-        lesson_steps_completed[str(lesson.id)] = []
+    # Mark current step as viewed if not already
+    if str_lesson_id not in lesson_steps_completed:
+        lesson_steps_completed[str_lesson_id] = []
     
-    if current_step not in lesson_steps_completed.get(str(lesson.id), []):
-        lesson_steps_completed.setdefault(str(lesson.id), []).append(current_step)
+    completed_steps = lesson_steps_completed.get(str_lesson_id, [])
+    
+    # If coming to step for first time, mark it as viewed
+    if current_step not in completed_steps:
+        completed_steps.append(current_step)
+        lesson_steps_completed[str_lesson_id] = completed_steps
         user_progress.lesson_steps_completed = lesson_steps_completed
         user_progress.save()
     
-    # If all steps are completed, mark the lesson as completed
-    if total_steps == len(lesson_steps_completed.get(str(lesson.id), [])):
+    # If all steps are completed, mark the lesson as completed (if not already)
+    if total_steps <= len(completed_steps) and lesson not in user_progress.lessons_completed.all():
         user_progress.lessons_completed.add(lesson)
+    
+    # Find the next lesson in sequence
+    current_module = lesson.module
+    next_lesson = None
+    next_lesson_url = None
+    
+    # First, try to find the next lesson in the same module
+    next_lesson_same_module = Lesson.objects.filter(
+        module=current_module, 
+        order__gt=lesson.order
+    ).order_by('order').first()
+    
+    if next_lesson_same_module:
+        next_lesson = next_lesson_same_module
+        next_lesson_url = reverse('lesson-detail', kwargs={'lesson_id': next_lesson_same_module.id})
+    else:
+        # Check if this module has a quiz
+        from quiz.models import Quiz
+        module_quiz = Quiz.objects.filter(module=current_module).first()
+        
+        if module_quiz:
+            # If all lessons in module are completed, point to the quiz
+            module_lessons = Lesson.objects.filter(module=current_module)
+            total_module_lessons = module_lessons.count()
+            completed_module_lessons = user_progress.lessons_completed.filter(module=current_module).count()
+            
+            if total_module_lessons > 0 and total_module_lessons == completed_module_lessons:
+                next_lesson_url = reverse('quiz:quiz_detail', kwargs={'pk': module_quiz.id})
+        else:
+            # If no more lessons in current module and no quiz, look for the next module
+            next_module = Module.objects.filter(
+                course=course, 
+                order__gt=current_module.order
+            ).order_by('order').first()
+            
+            if next_module:
+                # Get the first lesson of the next module
+                next_lesson = Lesson.objects.filter(
+                    module=next_module
+                ).order_by('order').first()
+                
+                if next_lesson:
+                    next_lesson_url = reverse('lesson-detail', kwargs={'lesson_id': next_lesson.id})
     
     context = {
         'lesson': lesson,
@@ -1175,7 +1358,10 @@ def lesson_detail(request, lesson_id):
         'current_content': current_content,
         'total_steps': total_steps,
         'current_step_percentage': current_step_percentage,
-        'course_progress': round(course_progress)
+        'course_progress': round(course_progress),
+        'next_lesson': next_lesson,
+        'next_lesson_url': next_lesson_url,
+        'completed_steps': completed_steps  # Add this for UI highlighting
     }
     
     return render(request, 'core/lesson_detail.html', context)
@@ -1191,32 +1377,117 @@ def mark_step_completed(request):
         lesson_id = data.get('lesson_id')
         step = int(data.get('step'))
         
-        lesson = get_object_or_404(Lesson, id=lesson_id)
+        # Use select_related to reduce queries
+        lesson = get_object_or_404(Lesson.objects.select_related('module', 'module__course'), id=lesson_id)
         course = lesson.course
+        current_module = lesson.module
         
         # Get user progress
-        user_progress = get_object_or_404(UserProgress, user=request.user, course=course)
+        user_progress = get_object_or_404(UserProgress.objects.prefetch_related('lessons_completed'), 
+                                         user=request.user, course=course)
         
         # Update completed steps
         lesson_steps_completed = user_progress.lesson_steps_completed or {}
+        str_lesson_id = str(lesson_id)  # Convert to string for JSON compatibility
         
-        if str(lesson_id) not in lesson_steps_completed:
-            lesson_steps_completed[str(lesson_id)] = []
+        # Initialize array for this lesson if not present
+        if str_lesson_id not in lesson_steps_completed:
+            lesson_steps_completed[str_lesson_id] = []
         
-        if step not in lesson_steps_completed[str(lesson_id)]:
-            lesson_steps_completed[str(lesson_id)].append(step)
+        # Add step if not already marked
+        if step not in lesson_steps_completed[str_lesson_id]:
+            lesson_steps_completed[str_lesson_id].append(step)
+            user_progress.lesson_steps_completed = lesson_steps_completed
         
-        user_progress.lesson_steps_completed = lesson_steps_completed
+        # Get total steps and check if lesson is completed
+        total_steps = lesson.steps.count()
+        lesson_completed = (total_steps == len(lesson_steps_completed.get(str_lesson_id, [])))
+        
+        # If all steps are completed, mark the lesson as completed
+        if lesson_completed and lesson not in user_progress.lessons_completed.all():
+            user_progress.lessons_completed.add(lesson)
+        
+        # Save changes
         user_progress.save()
         
-        # Check if all steps are completed
-        total_steps = lesson.steps.count()
-        if total_steps == len(lesson_steps_completed.get(str(lesson_id), [])):
-            user_progress.lessons_completed.add(lesson)
-            
-        return JsonResponse({'status': 'success'})
+        # Check if all lessons in this module are completed
+        module_lessons = Lesson.objects.filter(module=current_module)
+        total_module_lessons = module_lessons.count()
+        completed_module_lessons = user_progress.lessons_completed.filter(module=current_module).count()
+        module_completed = (total_module_lessons > 0 and total_module_lessons == completed_module_lessons)
+        
+        # Get quiz for this module if it exists
+        from quiz.models import Quiz
+        
+        module_quiz = None
+        quiz_url = None
+        
+        try:
+            module_quiz = Quiz.objects.filter(module=current_module).first()
+            if module_quiz and module_completed:
+                quiz_url = reverse('quiz:quiz_detail', kwargs={'pk': module_quiz.id})
+        except Exception as e:
+            print(f"Error getting module quiz: {e}")
+        
+        # Find next lesson if this one is completed
+        next_lesson_url = None
+        if lesson_completed:
+            # If module is completed and has a quiz, prioritize the quiz
+            if module_completed and quiz_url:
+                next_lesson_url = quiz_url
+            else:
+                # Find the next lesson in sequence
+                next_lesson = (
+                    Lesson.objects.filter(module=current_module, order__gt=lesson.order)
+                    .order_by('order')
+                    .first()
+                )
+                
+                if next_lesson:
+                    next_lesson_url = reverse('lesson-detail', kwargs={'lesson_id': next_lesson.id})
+                elif module_completed and not quiz_url:
+                    # If no more lessons in current module and no quiz, look for the next module
+                    next_module = (
+                        Module.objects.filter(course=course, order__gt=current_module.order)
+                        .order_by('order')
+                        .first()
+                    )
+                    
+                    if next_module:
+                        # Get the first lesson of the next module
+                        next_lesson = (
+                            Lesson.objects.filter(module=next_module)
+                            .order_by('order')
+                            .first()
+                        )
+                        
+                        if next_lesson:
+                            next_lesson_url = reverse('lesson-detail', kwargs={'lesson_id': next_lesson.id})
+        
+        # Debug information to help troubleshoot issues
+        debug_info = {
+            'total_steps': total_steps,
+            'steps_completed': len(lesson_steps_completed.get(str_lesson_id, [])),
+            'lesson_completed': lesson_completed,
+            'total_module_lessons': total_module_lessons,
+            'completed_module_lessons': completed_module_lessons,
+            'module_completed': module_completed,
+            'has_quiz': module_quiz is not None
+        }
+        
+        return JsonResponse({
+            'status': 'success',
+            'lesson_completed': lesson_completed,
+            'module_completed': module_completed,
+            'has_quiz': module_quiz is not None,
+            'quiz_url': quiz_url,
+            'next_lesson_url': next_lesson_url,
+            'debug_info': debug_info  # Include debug info in response
+        })
     
     except Exception as e:
+        import traceback
+        print(traceback.format_exc())
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 @login_required
