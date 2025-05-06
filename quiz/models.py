@@ -4,7 +4,7 @@ from core.models import CustomUser, Course, Module
 
 class Quiz(models.Model):
     """Quiz model with more interactive features than Test model"""
-    title = models.CharField(max_length=100)
+    title = models.CharField(max_length=100, db_index=True)
     description = models.TextField()
     module = models.OneToOneField(Module, on_delete=models.CASCADE, related_name='quiz', null=True, blank=True)
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='quizzes')
@@ -12,11 +12,15 @@ class Quiz(models.Model):
     passing_score = models.PositiveIntegerField(default=70, help_text=_('Percentage required to pass'))
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    is_published = models.BooleanField(default=True)
+    is_published = models.BooleanField(default=True, db_index=True)
     
     class Meta:
         verbose_name = _('Quiz')
         verbose_name_plural = _('Quizzes')
+        indexes = [
+            models.Index(fields=['course', 'is_published']),
+            models.Index(fields=['module']),
+        ]
     
     def __str__(self):
         return self.title
@@ -40,14 +44,17 @@ class Question(models.Model):
     
     quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE, related_name='questions')
     text = models.TextField()
-    question_type = models.CharField(max_length=20, choices=QUESTION_TYPES, default='single')
+    question_type = models.CharField(max_length=20, choices=QUESTION_TYPES, default='single', db_index=True)
     points = models.PositiveIntegerField(default=1)
     explanation = models.TextField(blank=True, help_text=_('Объяснение правильного ответа'))
     image = models.ImageField(upload_to='question_images/', null=True, blank=True)
-    order = models.PositiveIntegerField(default=0)
+    order = models.PositiveIntegerField(default=0, db_index=True)
     
     class Meta:
         ordering = ['order', 'id']
+        indexes = [
+            models.Index(fields=['quiz', 'order']),
+        ]
     
     def __str__(self):
         return self.text[:50]
@@ -69,7 +76,13 @@ class QuizAttempt(models.Model):
     start_time = models.DateTimeField(auto_now_add=True)
     end_time = models.DateTimeField(null=True, blank=True)
     score = models.FloatField(null=True, blank=True)
-    is_completed = models.BooleanField(default=False)
+    is_completed = models.BooleanField(default=False, db_index=True)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['quiz', 'user']),
+            models.Index(fields=['user', 'is_completed']),
+        ]
     
     def __str__(self):
         return f"{self.user.username}'s attempt at {self.quiz.title}"

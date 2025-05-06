@@ -26,7 +26,7 @@
         </div>
         <div class="col-md-4 text-md-end">
             <!-- Admin controls -->
-            {% if user.is_staff or quiz.author == user %}
+            {% if user.is_staff or quiz.course.author == user %}
                 <div class="btn-group">
                     <a href="{% url 'quiz:edit_quiz' quiz.pk %}" class="btn btn-outline-primary">
                         <i class="fas fa-edit me-2"></i>{% trans "Редактировать" %}
@@ -77,7 +77,12 @@
                         <div class="col-md-6">
                             <p class="mb-2">
                                 <i class="fas fa-user me-2"></i>
-                                <strong>{% trans "Автор" %}:</strong> {{ quiz.author.first_name }} {{ quiz.author.last_name }}
+                                <strong>{% trans "Автор" %}:</strong> 
+                                {% if quiz.course and quiz.course.author %}
+                                    {{ quiz.course.author.first_name }} {{ quiz.course.author.last_name }}
+                                {% else %}
+                                    {% trans "Не указан" %}
+                                {% endif %}
                             </p>
                         </div>
                     </div>
@@ -91,14 +96,18 @@
                     {% endif %}
                     
                     <div class="d-grid mt-4">
-                        {% if latest_attempt and not latest_attempt.completed_at %}
+                        {% if latest_attempt and not latest_attempt.end_time %}
                             <a href="{% url 'quiz:take_quiz' quiz.pk %}" class="btn btn-primary">
                                 <i class="fas fa-play me-2"></i>{% trans "Продолжить тест" %}
                             </a>
-                        {% else %}
+                        {% elif quiz.total_questions > 0 %}
                             <a href="{% url 'quiz:take_quiz' quiz.pk %}" class="btn btn-primary">
                                 <i class="fas fa-play me-2"></i>{% trans "Начать тест" %}
                             </a>
+                        {% else %}
+                            <button class="btn btn-primary" disabled>
+                                <i class="fas fa-exclamation-circle me-2"></i>{% trans "Нет вопросов в тесте" %}
+                            </button>
                         {% endif %}
                     </div>
                 </div>
@@ -114,15 +123,15 @@
                     {% if attempts %}
                         <div class="list-group">
                             {% for attempt in attempts %}
-                                <a href="{% if attempt.completed_at %}{% url 'quiz:quiz_results' attempt.id %}{% else %}{% url 'quiz:take_quiz' quiz.pk %}{% endif %}" 
+                                <a href="{% if attempt.end_time %}{% url 'quiz:quiz_results' attempt.id %}{% else %}{% url 'quiz:take_quiz' quiz.pk %}{% endif %}" 
                                    class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                                     <div>
-                                        <small class="text-muted">{{ attempt.started_at|date:"d.m.Y H:i" }}</small>
+                                        <small class="text-muted">{{ attempt.start_time|date:"d.m.Y H:i" }}</small>
                                         <div>
-                                            {% if attempt.completed_at %}
-                                                <span class="{% if attempt.passed %}text-success{% else %}text-danger{% endif %}">
-                                                    <i class="fas {% if attempt.passed %}fa-check-circle{% else %}fa-times-circle{% endif %} me-2"></i>
-                                                    {% if attempt.passed %}
+                                            {% if attempt.end_time %}
+                                                <span class="{% if attempt.is_passed %}text-success{% else %}text-danger{% endif %}">
+                                                    <i class="fas {% if attempt.is_passed %}fa-check-circle{% else %}fa-times-circle{% endif %} me-2"></i>
+                                                    {% if attempt.is_passed %}
                                                         {% trans "Пройден" %}: {{ attempt.score_percentage }}%
                                                     {% else %}
                                                         {% trans "Не пройден" %}: {{ attempt.score_percentage }}%

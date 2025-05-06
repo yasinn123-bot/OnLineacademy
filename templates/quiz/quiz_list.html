@@ -92,11 +92,11 @@
                             
                             {% if quiz.id in user_attempts %}
                                 {% with attempt=user_attempts|get_item:quiz.id %}
-                                    {% if attempt.completed_at %}
+                                    {% if attempt.end_time %}
                                         <div class="d-flex align-items-center mb-2">
-                                            <span class="{% if attempt.passed %}text-success{% else %}text-danger{% endif %}">
-                                                <i class="fas {% if attempt.passed %}fa-check-circle{% else %}fa-times-circle{% endif %} me-2"></i>
-                                                {% if attempt.passed %}
+                                            <span class="{% if attempt.is_passed %}text-success{% else %}text-danger{% endif %}">
+                                                <i class="fas {% if attempt.is_passed %}fa-check-circle{% else %}fa-times-circle{% endif %} me-2"></i>
+                                                {% if attempt.is_passed %}
                                                     {% trans "Пройден" %}: {{ attempt.score_percentage }}%
                                                 {% else %}
                                                     {% trans "Не пройден" %}: {{ attempt.score_percentage }}%
@@ -117,7 +117,7 @@
                             <a href="{% url 'quiz:quiz_detail' quiz.pk %}" class="btn btn-outline-primary w-100">
                                 {% if quiz.id in user_attempts %}
                                     {% with attempt=user_attempts|get_item:quiz.id %}
-                                        {% if attempt.completed_at %}
+                                        {% if attempt.end_time %}
                                             <i class="fas fa-eye me-2"></i>{% trans "Просмотреть результаты" %}
                                         {% else %}
                                             <i class="fas fa-play me-2"></i>{% trans "Продолжить" %}

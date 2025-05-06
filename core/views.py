@@ -585,7 +585,11 @@ def course_detail(request, pk):
     if cached_data:
         return render(request, 'core/course_detail.html', cached_data)
     
-    course = get_object_or_404(Course.objects.select_related('author'), pk=pk)
+    # Fetch course with author in a single query
+    course = get_object_or_404(
+        Course.objects.select_related('author'),
+        pk=pk
+    )
     user_role = get_user_role(request.user)
     
     # Check if the user is enrolled
@@ -595,19 +599,36 @@ def course_detail(request, pk):
     progress_percentage = 0
     
     if request.user.is_authenticated:
+        # Get user progress with all completed items in a single query
         user_progress = UserProgress.objects.filter(
             user=request.user, course=course
-        ).prefetch_related('materials_completed', 'tests_completed', 'lessons_completed').first()
+        ).prefetch_related(
+            'materials_completed', 
+            'tests_completed', 
+            'lessons_completed'
+        ).first()
         is_enrolled = user_progress is not None
     
     # Import Quiz model here to avoid circular imports
     from quiz.models import Quiz, QuizAttempt
     
-    # Get modules with their related quizzes for efficient loading
-    course_modules = list(course.modules.prefetch_related('quiz').all().order_by('order'))
+    # Get modules with their lessons and quizzes in an efficient query
+    course_modules = list(
+        Module.objects.filter(course=course)
+        .prefetch_related(
+            'quiz',
+            Prefetch('lessons', queryset=Lesson.objects.order_by('order'))
+        )
+        .order_by('order')
+    )
     
-    # Get quizzes for this course with prefetch related for better performance
-    quizzes = Quiz.objects.filter(course=course).select_related('module').prefetch_related('questions')
+    # Get quizzes for this course with all related data
+    quizzes = Quiz.objects.filter(course=course).select_related(
+        'module', 'course'
+    ).prefetch_related(
+        'questions', 
+        'questions__choices'
+    )
     
     # Create a dictionary mapping module IDs to quizzes for efficient access
     module_quizzes = {}
@@ -631,7 +652,6 @@ def course_detail(request, pk):
         # Find the next lesson to continue with
         if user_progress:
             # Get all lessons for this course
-            from core.models import Lesson
             all_lessons = Lesson.objects.filter(module__course=course).order_by('module__order', 'order')
             
             # Get the completed lessons IDs
@@ -1228,60 +1248,74 @@ class MaterialDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 
 @login_required
 def lesson_detail(request, lesson_id):
-    # Use select_related to reduce queries
+    # Use caching to speed up navigation between lessons
+    cache_key = f'lesson_detail_{lesson_id}_{request.user.id}'
+    cached_data = cache.get(cache_key)
+    
+    # Get the step parameter before possibly returning cached data
+    current_step_param = int(request.GET.get('step', '1'))
+    
+    if cached_data and 'steps' in cached_data:
+        # Only update the current step in the cached data
+        total_steps = len(cached_data['steps'])
+        if current_step_param < 1 or current_step_param > total_steps:
+            current_step_param = 1
+        
+        cached_data['current_step'] = current_step_param
+        cached_data['current_content'] = cached_data['steps'][current_step_param - 1] if cached_data['steps'] else None
+        
+        if total_steps > 0:
+            cached_data['current_step_percentage'] = (current_step_param / total_steps) * 100
+        
+        return render(request, 'core/lesson_detail.html', cached_data)
+    
+    # Use select_related and prefetch_related to optimize queries
     lesson = get_object_or_404(
-        Lesson.objects.select_related('module', 'module__course', 'quiz')
-                     .prefetch_related('additional_resources'),
+        Lesson.objects.select_related(
+            'module', 
+            'module__course', 
+            'module__course__author'
+        ).prefetch_related(
+            'additional_resources',
+            'steps',
+            'quiz'
+        ), 
         id=lesson_id
     )
-    course = lesson.course
     
-    # Check if user is enrolled in the course
-    try:
-        user_progress = UserProgress.objects.prefetch_related(
-            'lessons_completed', 'tests_completed'
-        ).get(user=request.user, course=course)
-    except UserProgress.DoesNotExist:
-        messages.warning(request, _("Вы не записаны на этот курс. Пожалуйста, запишитесь для просмотра уроков."))
-        return redirect('course-detail', course.id)
+    module = lesson.module
+    course = module.course
     
-    # Get all steps for this lesson with prefetch_related for images
-    lesson_steps = list(lesson.steps.all().order_by('order'))
-    total_steps = len(lesson_steps)
+    # Get all steps for this lesson
+    steps = list(LessonContent.objects.filter(lesson=lesson).order_by('order'))
     
-    if total_steps == 0:
-        messages.warning(request, _("В данном уроке пока нет содержимого. Попробуйте позже."))
-        return redirect('course-detail', course.id)
-    
-    # Determine current step (from query parameter or user progress)
-    try:
-        current_step = int(request.GET.get('step', 1))
-        if current_step < 1:
-            current_step = 1
-        elif current_step > total_steps:
-            current_step = total_steps
-    except ValueError:
+    # Determine which step to show
+    current_step = current_step_param
+    if current_step < 1 or current_step > len(steps):
         current_step = 1
     
-    # Load content for current step
-    current_content = lesson_steps[current_step - 1]
+    # Get the current step content
+    current_step_content = steps[current_step - 1] if steps and current_step <= len(steps) else None
+    
+    # Get user progress with efficient prefetching in a single query
+    user_progress = UserProgress.objects.filter(
+        user=request.user, 
+        course=course
+    ).prefetch_related(
+        'lessons_completed',
+        'tests_completed'
+    ).first()
+    
+    if not user_progress:
+        # Create progress record if it doesn't exist
+        user_progress = UserProgress.objects.create(user=request.user, course=course)
     
     # Calculate percentage for progress bar
-    current_step_percentage = (current_step / total_steps) * 100
-    
-    # Get course progress percentage - use one query instead of two
-    from django.db.models import Count
-    
-    course_stats = Lesson.objects.filter(module__course=course).aggregate(
-        total_lessons=Count('id')
-    )
-    total_lessons = course_stats['total_lessons']
-    completed_lessons = user_progress.lessons_completed.count()
-    
-    if total_lessons > 0:
-        course_progress = (completed_lessons / total_lessons) * 100
+    total_steps = len(steps)
+    if total_steps > 0:
+        progress_percentage = (current_step / total_steps) * 100
     else:
-        course_progress = 0
+        progress_percentage = 0
     
     # Check if the user has already completed this step/lesson
     lesson_steps_completed = user_progress.lesson_steps_completed or {}
@@ -1308,61 +1342,87 @@ def lesson_detail(request, lesson_id):
     if total_steps <= len(completed_steps) and lesson not in user_progress.lessons_completed.all():
         user_progress.lessons_completed.add(lesson)
     
-    # Find the next lesson in sequence
-    current_module = lesson.module
+    # Precompute next lesson data more efficiently
     next_lesson = None
     next_lesson_url = None
     
-    # First, try to find the next lesson in the same module
-    next_lesson_same_module = Lesson.objects.filter(
-        module=current_module, 
-        order__gt=lesson.order
-    ).order_by('order').first()
+    # Check for next lesson in module (optimize by using cached course structure)
+    module_lessons_key = f'module_lessons_{module.id}'
+    module_lessons = cache.get(module_lessons_key)
     
-    if next_lesson_same_module:
-        next_lesson = next_lesson_same_module
-        next_lesson_url = reverse('lesson-detail', kwargs={'lesson_id': next_lesson_same_module.id})
+    if not module_lessons:
+        module_lessons = list(Lesson.objects.filter(
+            module=module
+        ).order_by('order').values('id', 'order'))
+        cache.set(module_lessons_key, module_lessons, 300)  # Cache for 5 minutes
+    
+    # Find next lesson in the same module
+    current_lesson_index = None
+    for i, l in enumerate(module_lessons):
+        if l['id'] == lesson.id:
+            current_lesson_index = i
+            break
+    
+    if current_lesson_index is not None and current_lesson_index < len(module_lessons) - 1:
+        next_lesson_id = module_lessons[current_lesson_index + 1]['id']
+        next_lesson_url = reverse('lesson-detail', kwargs={'lesson_id': next_lesson_id})
     else:
         # Check if this module has a quiz
         from quiz.models import Quiz
-        module_quiz = Quiz.objects.filter(module=current_module).first()
+        module_quiz_key = f'module_quiz_{module.id}'
+        module_quiz = cache.get(module_quiz_key)
+        
+        if module_quiz is None:
+            module_quiz = Quiz.objects.filter(module=module).first()
+            cache.set(module_quiz_key, module_quiz, 300)  # Cache for 5 minutes
         
         if module_quiz:
             # If all lessons in module are completed, point to the quiz
-            module_lessons = Lesson.objects.filter(module=current_module)
-            total_module_lessons = module_lessons.count()
-            completed_module_lessons = user_progress.lessons_completed.filter(module=current_module).count()
+            module_lessons_count = len(module_lessons)
+            completed_module_lessons = user_progress.lessons_completed.filter(module=module).count()
             
-            if total_module_lessons > 0 and total_module_lessons == completed_module_lessons:
+            if module_lessons_count > 0 and module_lessons_count == completed_module_lessons:
                 next_lesson_url = reverse('quiz:quiz_detail', kwargs={'pk': module_quiz.id})
         else:
-            # If no more lessons in current module and no quiz, look for the next module
-            next_module = Module.objects.filter(
-                course=course, 
-                order__gt=current_module.order
-            ).order_by('order').first()
+            # Look for first lesson in next module
+            course_modules_key = f'course_modules_{course.id}'
+            course_modules = cache.get(course_modules_key)
             
-            if next_module:
-                # Get the first lesson of the next module
-                next_lesson = Lesson.objects.filter(
-                    module=next_module
+            if not course_modules:
+                course_modules = list(Module.objects.filter(
+                    course=course
+                ).order_by('order').values('id', 'order'))
+                cache.set(course_modules_key, course_modules, 300)
+            
+            current_module_index = None
+            for i, m in enumerate(course_modules):
+                if m['id'] == module.id:
+                    current_module_index = i
+                    break
+            
+            if current_module_index is not None and current_module_index < len(course_modules) - 1:
+                next_module_id = course_modules[current_module_index + 1]['id']
+                next_module_first_lesson = Lesson.objects.filter(
+                    module_id=next_module_id
                 ).order_by('order').first()
                 
-                if next_lesson:
-                    next_lesson_url = reverse('lesson-detail', kwargs={'lesson_id': next_lesson.id})
+                if next_module_first_lesson:
+                    next_lesson_url = reverse('lesson-detail', kwargs={'lesson_id': next_module_first_lesson.id})
     
     context = {
         'lesson': lesson,
-        'lesson_steps': lesson_steps,
+        'steps': steps,
         'current_step': current_step,
-        'current_content': current_content,
+        'current_content': current_step_content,
         'total_steps': total_steps,
-        'current_step_percentage': current_step_percentage,
-        'course_progress': round(course_progress),
-        'next_lesson': next_lesson,
+        'current_step_percentage': progress_percentage,
+        'course_progress': round(progress_percentage),
         'next_lesson_url': next_lesson_url,
         'completed_steps': completed_steps  # Add this for UI highlighting
     }
+    
+    # Cache the result for faster subsequent access
+    cache.set(cache_key, context, 180)  # Cache for 3 minutes
     
     return render(request, 'core/lesson_detail.html', context)
 
@@ -1377,14 +1437,28 @@ def mark_step_completed(request):
         lesson_id = data.get('lesson_id')
         step = int(data.get('step'))
         
-        # Use select_related to reduce queries
-        lesson = get_object_or_404(Lesson.objects.select_related('module', 'module__course'), id=lesson_id)
-        course = lesson.course
+        # Use cache to check if we've processed this step recently
+        cache_key = f'step_completed_{request.user.id}_{lesson_id}_{step}'
+        cached_result = cache.get(cache_key)
+        if cached_result:
+            return JsonResponse(cached_result)
+        
+        # Get lesson with minimal related data
+        lesson = get_object_or_404(
+            Lesson.objects.select_related('module', 'module__course'),
+            id=lesson_id
+        )
+        course = lesson.module.course
         current_module = lesson.module
         
-        # Get user progress
-        user_progress = get_object_or_404(UserProgress.objects.prefetch_related('lessons_completed'), 
-                                         user=request.user, course=course)
+        # Get user progress with minimal related data
+        user_progress = UserProgress.objects.filter(
+            user=request.user, course=course
+        ).prefetch_related('lessons_completed').first()
+        
+        if not user_progress:
+            # Create a new progress record if it doesn't exist
+            user_progress = UserProgress.objects.create(user=request.user, course=course)
         
         # Update completed steps
         lesson_steps_completed = user_progress.lesson_steps_completed or {}
@@ -1398,96 +1472,127 @@ def mark_step_completed(request):
         if step not in lesson_steps_completed[str_lesson_id]:
             lesson_steps_completed[str_lesson_id].append(step)
             user_progress.lesson_steps_completed = lesson_steps_completed
+            
+            # Get total steps for this lesson (use cache)
+            steps_count_key = f'lesson_steps_count_{lesson_id}'
+            total_steps = cache.get(steps_count_key)
+            if total_steps is None:
+                total_steps = LessonContent.objects.filter(lesson=lesson).count()
+                cache.set(steps_count_key, total_steps, 3600)  # Cache for 1 hour
+            
+            # Mark lesson as completed if all steps are done
+            lesson_completed = (total_steps == len(lesson_steps_completed.get(str_lesson_id, [])))
+            if lesson_completed and lesson not in user_progress.lessons_completed.all():
+                user_progress.lessons_completed.add(lesson)
+            
+            # Save changes
+            user_progress.save()
+        else:
+            # Step already completed, no need to save
+            lesson_completed = True
         
-        # Get total steps and check if lesson is completed
-        total_steps = lesson.steps.count()
-        lesson_completed = (total_steps == len(lesson_steps_completed.get(str_lesson_id, [])))
+        # Check if all lessons in this module are completed (use cached data if available)
+        module_completion_key = f'module_completion_{current_module.id}_{request.user.id}'
+        module_completion_data = cache.get(module_completion_key)
         
-        # If all steps are completed, mark the lesson as completed
-        if lesson_completed and lesson not in user_progress.lessons_completed.all():
-            user_progress.lessons_completed.add(lesson)
+        if module_completion_data is None:
+            # Calculate module completion data
+            module_lessons_key = f'module_lessons_{current_module.id}'
+            module_lessons = cache.get(module_lessons_key)
+            
+            if not module_lessons:
+                module_lessons = list(Lesson.objects.filter(
+                    module=current_module
+                ).values_list('id', flat=True))
+                cache.set(module_lessons_key, module_lessons, 300)  # Cache for 5 minutes
+                
+            total_module_lessons = len(module_lessons)
+            completed_module_lessons = user_progress.lessons_completed.filter(
+                module=current_module
+            ).count()
+            
+            module_completed = (total_module_lessons > 0 and 
+                                total_module_lessons == completed_module_lessons)
+            
+            module_completion_data = {
+                'total_lessons': total_module_lessons,
+                'completed_lessons': completed_module_lessons,
+                'module_completed': module_completed
+            }
+            
+            # Cache module completion data
+            cache.set(module_completion_key, module_completion_data, 60)  # Cache for 1 minute
+        else:
+            module_completed = module_completion_data['module_completed']
         
-        # Save changes
-        user_progress.save()
+        # Get quiz for this module if it exists (use cached data)
+        quiz_key = f'module_quiz_{current_module.id}'
+        module_quiz = cache.get(quiz_key)
         
-        # Check if all lessons in this module are completed
-        module_lessons = Lesson.objects.filter(module=current_module)
-        total_module_lessons = module_lessons.count()
-        completed_module_lessons = user_progress.lessons_completed.filter(module=current_module).count()
-        module_completed = (total_module_lessons > 0 and total_module_lessons == completed_module_lessons)
-        
-        # Get quiz for this module if it exists
-        from quiz.models import Quiz
-        
-        module_quiz = None
-        quiz_url = None
-        
-        try:
+        if module_quiz is None:
+            from quiz.models import Quiz
             module_quiz = Quiz.objects.filter(module=current_module).first()
-            if module_quiz and module_completed:
-                quiz_url = reverse('quiz:quiz_detail', kwargs={'pk': module_quiz.id})
-        except Exception as e:
-            print(f"Error getting module quiz: {e}")
+            cache.set(quiz_key, module_quiz, 300)  # Cache for 5 minutes
         
-        # Find next lesson if this one is completed
+        # Prepare response data
+        has_quiz = module_quiz is not None
+        quiz_url = reverse('quiz:quiz_detail', kwargs={'pk': module_quiz.id}) if has_quiz else None
+        
+        # Get next lesson URL (use cached data)
         next_lesson_url = None
+        
         if lesson_completed:
-            # If module is completed and has a quiz, prioritize the quiz
-            if module_completed and quiz_url:
-                next_lesson_url = quiz_url
-            else:
-                # Find the next lesson in sequence
-                next_lesson = (
-                    Lesson.objects.filter(module=current_module, order__gt=lesson.order)
-                    .order_by('order')
-                    .first()
-                )
+            # Check if there's already a computed next lesson URL in cache
+            next_url_key = f'next_lesson_url_{lesson_id}_{request.user.id}'
+            next_lesson_url = cache.get(next_url_key)
+            
+            if next_lesson_url is None:
+                # Find next lesson in the same module
+                next_lesson = Lesson.objects.filter(
+                    module=current_module, 
+                    order__gt=lesson.order
+                ).order_by('order').first()
                 
                 if next_lesson:
                     next_lesson_url = reverse('lesson-detail', kwargs={'lesson_id': next_lesson.id})
-                elif module_completed and not quiz_url:
-                    # If no more lessons in current module and no quiz, look for the next module
-                    next_module = (
-                        Module.objects.filter(course=course, order__gt=current_module.order)
-                        .order_by('order')
-                        .first()
-                    )
+                elif module_completed and has_quiz:
+                    next_lesson_url = quiz_url
+                else:
+                    # Try to find the first lesson in the next module
+                    next_module = Module.objects.filter(
+                        course=course, 
+                        order__gt=current_module.order
+                    ).order_by('order').first()
                     
                     if next_module:
-                        # Get the first lesson of the next module
-                        next_lesson = (
-                            Lesson.objects.filter(module=next_module)
-                            .order_by('order')
-                            .first()
-                        )
+                        first_lesson_in_next_module = Lesson.objects.filter(
+                            module=next_module
+                        ).order_by('order').first()
                         
-                        if next_lesson:
-                            next_lesson_url = reverse('lesson-detail', kwargs={'lesson_id': next_lesson.id})
+                        if first_lesson_in_next_module:
+                            next_lesson_url = reverse('lesson-detail', 
+                                                     kwargs={'lesson_id': first_lesson_in_next_module.id})
+                
+                # Cache the computed next URL
+                if next_lesson_url:
+                    cache.set(next_url_key, next_lesson_url, 300)  # Cache for 5 minutes
         
-        # Debug information to help troubleshoot issues
-        debug_info = {
-            'total_steps': total_steps,
-            'steps_completed': len(lesson_steps_completed.get(str_lesson_id, [])),
-            'lesson_completed': lesson_completed,
-            'total_module_lessons': total_module_lessons,
-            'completed_module_lessons': completed_module_lessons,
-            'module_completed': module_completed,
-            'has_quiz': module_quiz is not None
-        }
-        
-        return JsonResponse({
+        # Prepare response
+        result = {
             'status': 'success',
             'lesson_completed': lesson_completed,
             'module_completed': module_completed,
-            'has_quiz': module_quiz is not None,
+            'has_quiz': has_quiz,
             'quiz_url': quiz_url,
             'next_lesson_url': next_lesson_url,
-            'debug_info': debug_info  # Include debug info in response
-        })
+        }
+        
+        # Cache the result
+        cache.set(cache_key, result, 60)  # Cache for 1 minute
+        
+        return JsonResponse(result)
     
     except Exception as e:
-        import traceback
-        print(traceback.format_exc())
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 @login_required

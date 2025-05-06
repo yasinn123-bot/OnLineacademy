@@ -46,18 +46,43 @@
 
                     {% if user.is_authenticated and user_role == 'student' and not user_progress %}
                     <div class="mt-4 text-center">
-                        <a href="{% url 'course-enroll' course.id %}" class="btn btn-primary btn-lg">
-                            <i class="fas fa-play-circle me-2"></i>{% trans "Начать обучение" %}
-                        </a>
+                        <form method="post" action="{% url 'course-enroll' course.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-sign-in-alt me-2"></i>{% trans "Записаться на курс" %}
+                            </button>
+                        </form>
                     </div>
-                    {% elif user_progress and not user_progress.lessons_completed.exists %}
-                    <div class="mt-4 text-center">
-                        {% if course.modules.first.lessons.first %}
-                        <a href="{% url 'lesson-detail' course.modules.first.lessons.first.id %}" class="btn btn-success btn-lg">
-                            <i class="fas fa-play-circle me-2"></i>{% trans "Начать обучение" %}
-                        </a>
-                        {% endif %}
-                    </div>
+                    {% elif user_progress %}
+                        <div class="mt-4 text-center">
+                            {% if not user_progress.lessons_completed.exists %}
+                                {% with first_lesson_found=False %}
+                                {% for module in course.modules.all %}
+                                    {% if module.lessons.exists and not first_lesson_found %}
+                                        {% with first_lesson_found=True %}
+                                        <a href="{% url 'lesson-detail' module.lessons.first.id %}" class="btn btn-success btn-lg">
+                                            <i class="fas fa-play-circle me-2"></i>{% trans "Начать обучение" %}
+                                        </a>
+                                        {% endwith %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% endwith %}
+                            {% else %}
+                                {% with current_lesson_found=False %}
+                                {% for module in modules %}
+                                    {% for lesson_status in module.lessons_with_status %}
+                                        {% if lesson_status.is_current and not current_lesson_found %}
+                                            {% with current_lesson_found=True %}
+                                            <a href="{% url 'lesson-detail' lesson_status.lesson.id %}" class="btn btn-success btn-lg">
+                                                <i class="fas fa-play-circle me-2"></i>{% trans "Продолжить обучение" %}
+                                            </a>
+                                            {% endwith %}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endfor %}
+                                {% endwith %}
+                            {% endif %}
+                        </div>
                     {% endif %}
                 </div>
             </div>

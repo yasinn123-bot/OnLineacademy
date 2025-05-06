@@ -20,17 +20,23 @@ class CustomUser(AbstractUser):
 
 
 class Course(models.Model):
-    title = models.CharField(max_length=100)
+    title = models.CharField(max_length=100, db_index=True)
     description = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='courses')
-    is_published = models.BooleanField(default=False)
+    is_published = models.BooleanField(default=False, db_index=True)
     language = models.CharField(max_length=10, choices=(
         ('ru', _('Русский')),
         ('en', _('Английский')),
         ('ky', _('Кыргызский'))
-    ), default='ru')
+    ), default='ru', db_index=True)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['author', 'is_published']),
+            models.Index(fields=['language', 'is_published']),
+        ]
     
     def __str__(self):
         return self.title
@@ -69,11 +75,14 @@ class Module(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='modules')
     title = models.CharField(max_length=100)
     description = models.TextField(blank=True)
-    order = models.PositiveIntegerField(default=1)
+    order = models.PositiveIntegerField(default=1, db_index=True)
     
     class Meta:
         ordering = ['order']
         unique_together = ('course', 'order')
+        indexes = [
+            models.Index(fields=['course', 'order']),
+        ]
     
     def __str__(self):
         return f"{self.course.title} - {self.title}"
@@ -129,13 +138,16 @@ class Lesson(models.Model):
     module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='lessons')
     title = models.CharField(max_length=100)
     description = models.TextField(blank=True)
-    order = models.PositiveIntegerField(default=1)
+    order = models.PositiveIntegerField(default=1, db_index=True)
     estimated_time = models.PositiveIntegerField(default=15, help_text=_('Estimated time to complete in minutes'))
     quiz = models.OneToOneField('quiz.Quiz', on_delete=models.SET_NULL, null=True, blank=True, related_name='lesson')
     
     class Meta:
         ordering = ['order']
         unique_together = ('module', 'order')
+        indexes = [
+            models.Index(fields=['module', 'order']),
+        ]
     
     def __str__(self):
         return self.title
@@ -310,11 +322,15 @@ class UserProgress(models.Model):
     materials_completed = models.ManyToManyField(Material, related_name='completed_by')
     tests_completed = models.ManyToManyField(Test, related_name='completed_by')
     lessons_completed = models.ManyToManyField(Lesson, related_name='completed_by')
-    lesson_steps_completed = models.JSONField(default=dict, blank=True, help_text=_('JSON containing lesson_id:step_number pairs for completed steps'))
     last_access = models.DateTimeField(auto_now=True)
+    lesson_steps_completed = models.JSONField(blank=True, default=dict, 
+                                             help_text=_('JSON containing lesson_id:step_number pairs for completed steps'))
     
     class Meta:
+        indexes = [
+            models.Index(fields=['user', 'course']),
+        ]
         unique_together = ('user', 'course')
     
     def __str__(self):
-        return f"{self.user.username}'s progress in {self.course.title}"
+        return f"{self.user.username} - {self.course.title}"

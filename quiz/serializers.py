@@ -58,11 +58,14 @@ class QuizListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Quiz
-        fields = ['id', 'title', 'description', 'course', 'course_title', 'author', 'author_name', 
-                 'time_limit', 'passing_score', 'is_published', 'total_questions', 'created_at']
+        fields = ['id', 'title', 'description', 'course', 'course_title', 
+                 'author_name', 'time_limit', 'passing_score', 'is_published', 
+                 'total_questions', 'created_at']
     
     def get_author_name(self, obj):
-        return f"{obj.author.first_name} {obj.author.last_name}"
+        if obj.course and obj.course.author:
+            return f"{obj.course.author.first_name} {obj.course.author.last_name}"
+        return None
     
     def get_course_title(self, obj):
         if obj.course:
@@ -76,11 +79,14 @@ class QuizDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Quiz
-        fields = ['id', 'title', 'description', 'course', 'course_title', 'author', 'author_name', 
-                 'time_limit', 'passing_score', 'is_published', 'questions', 'created_at', 'updated_at']
+        fields = ['id', 'title', 'description', 'course', 'course_title', 
+                 'author_name', 'time_limit', 'passing_score', 'is_published', 
+                 'questions', 'created_at', 'updated_at']
     
     def get_author_name(self, obj):
-        return f"{obj.author.first_name} {obj.author.last_name}"
+        if obj.course and obj.course.author:
+            return f"{obj.course.author.first_name} {obj.course.author.last_name}"
+        return None
     
     def get_course_title(self, obj):
         if obj.course:
@@ -92,8 +98,8 @@ class QuizCreateUpdateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Quiz
-        fields = ['id', 'title', 'description', 'course', 'author', 'time_limit', 
-                 'passing_score', 'is_published', 'questions']
+        fields = ['id', 'title', 'description', 'course', 'module', 
+                 'time_limit', 'passing_score', 'is_published', 'questions']
     
     def create(self, validated_data):
         questions_data = validated_data.pop('questions', [])
@@ -150,8 +156,8 @@ class QuizAttemptListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = QuizAttempt
-        fields = ['id', 'quiz', 'quiz_title', 'user', 'user_name', 'started_at', 
-                 'completed_at', 'score', 'score_percentage', 'passed']
+        fields = ['id', 'quiz', 'quiz_title', 'user', 'user_name', 'start_time', 
+                 'end_time', 'score', 'score_percentage', 'is_passed']
     
     def get_quiz_title(self, obj):
         return obj.quiz.title
@@ -167,8 +173,8 @@ class QuizAttemptDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = QuizAttempt
-        fields = ['id', 'quiz', 'quiz_title', 'user', 'user_name', 'started_at', 
-                 'completed_at', 'score', 'score_percentage', 'passed', 'answers']
+        fields = ['id', 'quiz', 'quiz_title', 'user', 'user_name', 'start_time', 
+                 'end_time', 'score', 'score_percentage', 'is_passed', 'answers']
     
     def get_quiz_title(self, obj):
         return obj.quiz.title

@@ -25,33 +25,33 @@ from .forms import QuizForm, QuestionForm
 
 # API Viewsets
 class QuizViewSet(viewsets.ModelViewSet):
-    queryset = Quiz.objects.all()
+    queryset = Quiz.objects.all().select_related('course', 'module')
     permission_classes = [IsAuthenticated]
     
     def get_serializer_class(self):
-        if self.action == 'list':
-            return QuizListSerializer
-        elif self.action in ['create', 'update', 'partial_update']:
+        if self.action == 'create' or self.action == 'update' or self.action == 'partial_update':
             return QuizCreateUpdateSerializer
-        return QuizDetailSerializer
+        else:
+            return QuizDetailSerializer
     
     def get_queryset(self):
         user = self.request.user
-        queryset = Quiz.objects.all()
         
-        # Filter by course if provided
-        course_id = self.request.query_params.get('course_id')
-        if course_id:
-            queryset = queryset.filter(course_id=course_id)
+        # If staff user, return all quizzes
+        if user.is_staff:
+            return Quiz.objects.all().select_related('course', 'module')
         
-        # Regular users (non-staff) can only see published quizzes
-        # or quizzes they authored
-        if not user.is_staff:
-            queryset = queryset.filter(
-                Q(is_published=True) | Q(author=user)
-            )
+        # If teacher/doctor, return published quizzes + quizzes for their courses
+        if user.role == 'doctor':
+            return Quiz.objects.filter(
+                Q(is_published=True) |
+                Q(course__author=user)
+            ).select_related('course', 'module')
         
-        return queryset
+        # For students, only return published quizzes
+        return Quiz.objects.filter(
+            is_published=True
+        ).select_related('course', 'module')
     
     @action(detail=True, methods=['post'])
     def start_attempt(self, request, pk=None):
@@ -62,7 +62,7 @@ class QuizViewSet(viewsets.ModelViewSet):
         existing_incomplete = QuizAttempt.objects.filter(
             quiz=quiz, 
             user=user, 
-            completed_at__isnull=True
+            end_time__isnull=True
         ).first()
         
         if existing_incomplete:
@@ -122,7 +122,7 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
             )
         
         # Verify attempt is not already completed
-        if attempt.completed_at is not None:
+        if attempt.end_time is not None:
             return Response(
                 {"detail": _("This attempt is already completed")}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -211,13 +211,13 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
             )['total'] or 0
             
             attempt.score = total_points
-            attempt.completed_at = timezone.now()
+            attempt.end_time = timezone.now()
             
             # Check if passed
             max_points = attempt.quiz.total_points
             if max_points > 0:
                 percentage = (total_points / max_points) * 100
-                attempt.passed = percentage >= attempt.quiz.passing_score
+                attempt.is_completed = True
             
             attempt.save()
         
@@ -237,7 +237,7 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
             )
         
         # Verify attempt is not already completed
-        if attempt.completed_at is not None:
+        if attempt.end_time is not None:
             return Response(
                 {"detail": _("This attempt is already completed")}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -250,13 +250,13 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
             )['total'] or 0
             
             attempt.score = total_points
-            attempt.completed_at = timezone.now()
+            attempt.end_time = timezone.now()
             
             # Check if passed
             max_points = attempt.quiz.total_points
             if max_points > 0:
                 percentage = (total_points / max_points) * 100
-                attempt.passed = percentage >= attempt.quiz.passing_score
+                attempt.is_completed = True
             
             attempt.save()
         
@@ -270,11 +270,13 @@ def quiz_list(request):
     course_id = request.GET.get('course')
     user_quizzes = request.GET.get('mine') == '1'
     
-    # Base queryset
+    # Base queryset with optimized relationships
+    base_queryset = Quiz.objects.select_related('course', 'module').prefetch_related('questions')
+    
     if request.user.is_staff or request.user.role == 'doctor':
-        quizzes = Quiz.objects.all()
+        quizzes = base_queryset
     else:
-        quizzes = Quiz.objects.filter(is_published=True)
+        quizzes = base_queryset.filter(is_published=True)
     
     # Apply filters
     if course_id:
@@ -305,45 +307,59 @@ def quiz_list(request):
 
 @login_required
 def quiz_detail(request, pk):
-    quiz = get_object_or_404(Quiz, pk=pk)
+    # Get quiz with all related data in one query
+    quiz = get_object_or_404(
+        Quiz.objects.select_related('course', 'module'),
+        pk=pk
+    )
     
     # Check if user has permission to view quiz
-    if not quiz.is_published and not request.user.is_staff and quiz.author != request.user:
+    course_author = quiz.course.author if quiz.course else None
+    if not quiz.is_published and not request.user.is_staff and course_author != request.user:
         messages.error(request, _("У вас нет доступа к этому тесту"))
-        return redirect('quiz_list')
+        return redirect('quiz:quiz_list')
     
-    # Get user's attempts for this quiz
+    # Get user's attempts for this quiz with efficient prefetching
     attempts = QuizAttempt.objects.filter(
         user=request.user,
         quiz=quiz
-    ).order_by('-started_at')
+    ).order_by('-start_time')
     
     # Get latest attempt
     latest_attempt = attempts.first()
+    
+    # Get question count in one query
+    question_count = Question.objects.filter(quiz=quiz).count()
     
     context = {
         'quiz': quiz,
         'attempts': attempts,
         'latest_attempt': latest_attempt,
         'user_role': request.user.role,
+        'question_count': question_count
     }
     
     return render(request, 'quiz/quiz_detail.html', context)
 
 @login_required
 def take_quiz(request, pk):
-    quiz = get_object_or_404(Quiz, pk=pk)
+    # Get quiz with related data
+    quiz = get_object_or_404(
+        Quiz.objects.select_related('course', 'module'),
+        pk=pk
+    )
     
     # Check if quiz is available to the user
-    if not quiz.is_published and not request.user.is_staff and quiz.author != request.user:
+    course_author = quiz.course.author if quiz.course else None
+    if not quiz.is_published and not request.user.is_staff and course_author != request.user:
         messages.error(request, _("У вас нет доступа к этому тесту"))
-        return redirect('quiz_list')
+        return redirect('quiz:quiz_list')
     
     # Check if there's an incomplete attempt
     attempt = QuizAttempt.objects.filter(
         quiz=quiz,
         user=request.user,
-        completed_at__isnull=True
+        end_time__isnull=True
     ).first()
     
     # If no existing attempt, create one
@@ -354,14 +370,14 @@ def take_quiz(request, pk):
         )
     
     # If the attempt is already complete, redirect to results
-    if attempt.completed_at:
-        return redirect('quiz_results', attempt_id=attempt.id)
+    if attempt.end_time:
+        return redirect('quiz:quiz_results', attempt_id=attempt.id)
     
-    # Get questions and answered question IDs
-    questions = Question.objects.filter(quiz=quiz).prefetch_related('choices')
-    answered_questions = StudentAnswer.objects.filter(
+    # Get questions and answered question IDs efficiently
+    questions = list(Question.objects.filter(quiz=quiz).prefetch_related('choices').order_by('order', 'id'))
+    answered_questions = list(StudentAnswer.objects.filter(
         attempt=attempt
-    ).values_list('question_id', flat=True)
+    ).values_list('question_id', flat=True))
     
     # Get current question (first unanswered)
     current_question = None
@@ -378,13 +394,17 @@ def take_quiz(request, pk):
             'user_role': request.user.role,
         })
     
+    # Calculate progress percentage
+    progress_percentage = (len(answered_questions) / len(questions)) * 100 if questions else 0
+    
     context = {
         'quiz': quiz,
         'attempt': attempt,
         'question': current_question,
-        'question_number': list(questions.values_list('id', flat=True)).index(current_question.id) + 1,
-        'total_questions': questions.count(),
+        'question_number': [q.id for q in questions].index(current_question.id) + 1 if current_question else 0,
+        'total_questions': len(questions),
         'answered_count': len(answered_questions),
+        'progress_percentage': progress_percentage,
         'user_role': request.user.role,
     }
     
@@ -398,7 +418,7 @@ def submit_answer(request, attempt_id):
     attempt = get_object_or_404(QuizAttempt, pk=attempt_id, user=request.user)
     
     # Ensure attempt is not already completed
-    if attempt.completed_at:
+    if attempt.end_time:
         return JsonResponse({'error': _('This attempt is already completed')}, status=400)
     
     # Get POST data
@@ -425,20 +445,20 @@ def submit_answer(request, attempt_id):
             if choice_id:
                 choice = get_object_or_404(Choice, pk=choice_id, question=question)
                 answer.save()  # Save to get an ID before setting many-to-many
-                answer.selected_choices.add(choice)
+                answer.choices.add(choice)
                 
                 if choice.is_correct:
                     answer.is_correct = True
                     answer.points_earned = question.points
         
         elif question.question_type == 'multiple':
-            choice_ids = request.POST.getlist('choice_ids[]')
+            choice_ids = request.POST.getlist('choice_ids')
             
             if choice_ids:
                 answer.save()  # Save to get an ID before setting many-to-many
                 
                 selected_choices = Choice.objects.filter(id__in=choice_ids, question=question)
-                answer.selected_choices.set(selected_choices)
+                answer.choices.set(selected_choices)
                 
                 # Check if all correct choices are selected and no incorrect ones
                 all_choices = Choice.objects.filter(question=question)
@@ -477,30 +497,28 @@ def submit_answer(request, attempt_id):
             )['total'] or 0
             
             attempt.score = total_points
-            attempt.completed_at = timezone.now()
+            attempt.end_time = timezone.now()
             
             # Check if passed
             max_points = attempt.quiz.total_points
             if max_points > 0:
                 percentage = (total_points / max_points) * 100
-                attempt.passed = percentage >= attempt.quiz.passing_score
+                attempt.is_completed = True
             
             attempt.save()
     
     # Redirect to next question or results page
-    next_url = request.POST.get('next_url') or reverse('take_quiz', args=[attempt.quiz.id])
-    
     if answered_questions >= total_questions:
-        next_url = reverse('quiz_results', args=[attempt.id])
-    
-    return JsonResponse({'success': True, 'next_url': next_url})
+        return redirect('quiz:quiz_results', attempt_id=attempt.id)
+    else:
+        return redirect('quiz:take_quiz', pk=attempt.quiz.id)
 
 @login_required
 def quiz_results(request, attempt_id):
     attempt = get_object_or_404(QuizAttempt, pk=attempt_id, user=request.user)
     
     # Make sure the attempt is completed
-    if not attempt.completed_at:
+    if not attempt.end_time:
         messages.warning(request, _("Этот тест еще не завершен"))
         return redirect('take_quiz', pk=attempt.quiz.id)
     
@@ -512,7 +530,7 @@ def quiz_results(request, attempt_id):
         'attempt': attempt,
         'answers': answers,
         'score_percentage': attempt.score_percentage,
-        'passed': attempt.passed,
+        'passed': attempt.is_passed,
         'user_role': request.user.role,
     }
     
@@ -522,36 +540,42 @@ def quiz_results(request, attempt_id):
 def create_quiz(request):
     # Only staff and doctors can create quizzes
     if not request.user.is_staff and request.user.role != 'doctor':
-        messages.error(request, _("У вас нет прав для создания тестов"))
+        messages.error(request, _("У вас нет доступа к созданию тестов"))
         return redirect('quiz:quiz_list')
     
     if request.method == 'POST':
         form = QuizForm(request.POST, user=request.user)
         if form.is_valid():
             quiz = form.save(commit=False)
-            quiz.author = request.user
+            # The author is the course author, not directly the quiz author
+            # Just save the quiz, don't set author directly
             quiz.save()
-            
-            messages.success(request, _("Тест успешно создан. Теперь добавьте вопросы."))
-            return redirect('quiz:edit_quiz', pk=quiz.id)
+            messages.success(request, _("Тест успешно создан"))
+            return redirect('quiz:edit_quiz', pk=quiz.pk)
     else:
-        form = QuizForm(user=request.user)
+        # Get course_id from query parameters
+        course_id = request.GET.get('course')
+        initial = {}
+        if course_id:
+            initial['course'] = course_id
+        form = QuizForm(user=request.user, initial=initial)
     
     context = {
         'form': form,
         'user_role': request.user.role,
     }
     
-    return render(request, 'quiz/create_quiz.html', context)
+    return render(request, 'quiz/quiz_form.html', context)
 
 @login_required
 def edit_quiz(request, pk):
-    quiz = get_object_or_404(Quiz, pk=pk)
+    quiz = get_object_or_404(Quiz.objects.select_related('course'), pk=pk)
     
-    # Check permissions
-    if not request.user.is_staff and quiz.author != request.user:
-        messages.error(request, _("У вас нет прав для редактирования этого теста"))
-        return redirect('quiz_list')
+    # Only staff or the course author can edit quizzes
+    course_author = quiz.course.author if quiz.course else None
+    if not request.user.is_staff and course_author != request.user:
+        messages.error(request, _("У вас нет доступа к редактированию этого теста"))
+        return redirect('quiz:quiz_list')
     
     # Get courses for dropdown
     if request.user.is_staff:
@@ -607,12 +631,13 @@ def edit_quiz(request, pk):
 
 @login_required
 def create_question(request, quiz_id):
-    quiz = get_object_or_404(Quiz, pk=quiz_id)
+    quiz = get_object_or_404(Quiz.objects.select_related('course'), id=quiz_id)
     
     # Check permissions
-    if not request.user.is_staff and quiz.author != request.user:
-        messages.error(request, _("У вас нет прав для редактирования этого теста"))
-        return redirect('quiz:quiz_list')
+    course_author = quiz.course.author if quiz.course else None
+    if not request.user.is_staff and course_author != request.user:
+        messages.error(request, _("У вас нет прав для добавления вопросов в этот тест"))
+        return redirect('quiz:quiz_detail', pk=quiz.id)
     
     if request.method == 'POST':
         form = QuestionForm(request.POST)
@@ -638,13 +663,14 @@ def create_question(request, quiz_id):
 
 @login_required
 def edit_question(request, question_id):
-    question = get_object_or_404(Question, pk=question_id)
+    question = get_object_or_404(Question.objects.select_related('quiz__course'), id=question_id)
     quiz = question.quiz
     
     # Check permissions
-    if not request.user.is_staff and quiz.author != request.user:
+    course_author = quiz.course.author if quiz.course else None
+    if not request.user.is_staff and course_author != request.user:
         messages.error(request, _("У вас нет прав для редактирования этого вопроса"))
-        return redirect('quiz_list')
+        return redirect('quiz:quiz_detail', pk=quiz.id)
     
     if request.method == 'POST':
         # Process form data
@@ -699,13 +725,14 @@ def edit_question(request, question_id):
 
 @login_required
 def delete_question(request, question_id):
-    question = get_object_or_404(Question, pk=question_id)
+    question = get_object_or_404(Question.objects.select_related('quiz__course'), id=question_id)
     quiz = question.quiz
     
     # Check permissions
-    if not request.user.is_staff and quiz.author != request.user:
+    course_author = quiz.course.author if quiz.course else None
+    if not request.user.is_staff and course_author != request.user:
         messages.error(request, _("У вас нет прав для удаления этого вопроса"))
-        return redirect('quiz_list')
+        return redirect('quiz:quiz_detail', pk=quiz.id)
     
     if request.method == 'POST':
         question.delete()
@@ -715,12 +742,13 @@ def delete_question(request, question_id):
 
 @login_required
 def delete_quiz(request, pk):
-    quiz = get_object_or_404(Quiz, pk=pk)
+    quiz = get_object_or_404(Quiz.objects.select_related('course'), pk=pk)
     
     # Check permissions
-    if not request.user.is_staff and quiz.author != request.user:
+    course_author = quiz.course.author if quiz.course else None
+    if not request.user.is_staff and course_author != request.user:
         messages.error(request, _("У вас нет прав для удаления этого теста"))
-        return redirect('quiz_list')
+        return redirect('quiz:quiz_detail', pk=pk)
     
     if request.method == 'POST':
         quiz.delete()

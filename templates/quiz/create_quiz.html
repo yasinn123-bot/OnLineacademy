@@ -192,12 +192,37 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        // Form validation
+        const form = document.getElementById('createQuizForm');
+        const titleInput = document.getElementById('{{ form.title.id_for_label }}');
+        
+        form.addEventListener('submit', function(e) {
+            let isValid = true;
+            
+            // Validate title
+            if (!titleInput.value.trim()) {
+                isValid = false;
+                // Add error styling if not already added by Django
+                if (!titleInput.classList.contains('is-invalid')) {
+                    titleInput.classList.add('is-invalid');
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'invalid-feedback d-block';
+                    errorDiv.textContent = '{% trans "Это поле обязательно." %}';
+                    titleInput.parentNode.appendChild(errorDiv);
+                }
+            }
+            
+            if (!isValid) {
+                e.preventDefault();
+            }
+        });
+        
         // Show course field only if course is selected in URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const courseParam = urlParams.get('course');
         
         if (courseParam) {
-            const courseSelect = document.querySelector('#id_course');
+            const courseSelect = document.getElementById('{{ form.course.id_for_label }}');
             if (courseSelect) {
                 courseSelect.value = courseParam;
             }
